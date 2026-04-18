@@ -11,7 +11,6 @@ import {
   ShoppingBag,
   Menu,
   X,
-  ChevronRight,
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -21,11 +20,11 @@ function cn(...inputs: ClassValue[]) {
 }
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard, description: 'Business overview' },
-  { name: 'Ingredients', href: '/ingredients', icon: Package, description: 'Stock & materials' },
-  { name: 'Procurement', href: '/procurement', icon: ShoppingCart, description: 'Purchase logs' },
-  { name: 'Recipes & HPP', href: '/recipes', icon: UtensilsCrossed, description: 'Cost of goods' },
-  { name: 'Point of Sale', href: '/pos', icon: ShoppingBag, description: 'Process orders' },
+  { name: 'Dasbor', href: '/', icon: LayoutDashboard, description: 'Ringkasan bisnis' },
+  { name: 'Bahan Baku', href: '/ingredients', icon: Package, description: 'Stok & material' },
+  { name: 'Pembelian', href: '/procurement', icon: ShoppingCart, description: 'Log pengadaan' },
+  { name: 'Resep & HPP', href: '/recipes', icon: UtensilsCrossed, description: 'Harga pokok' },
+  { name: 'Kasir', href: '/pos', icon: ShoppingBag, description: 'Proses transaksi' },
 ];
 
 export function LayoutShell({ children }: { children: React.ReactNode }) {
@@ -33,11 +32,12 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-[#080808] text-zinc-100 flex">
+    <div className="min-h-screen flex" style={{ background: 'var(--bg)' }}>
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 lg:hidden"
+          style={{ background: 'rgba(10,9,5,0.8)', backdropFilter: 'blur(4px)' }}
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -45,30 +45,60 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-64 flex flex-col bg-[#0f0f0f] border-r border-white/[0.06] transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static',
+          'fixed inset-y-0 left-0 z-50 w-60 flex flex-col transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
+        style={{
+          background: 'var(--bg-card)',
+          borderRight: '1px solid var(--border)',
+        }}
       >
         {/* Logo */}
-        <div className="flex items-center justify-between h-16 px-5 border-b border-white/[0.06] shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-violet-500 flex items-center justify-center shadow-lg shadow-violet-500/30">
-              <span className="font-bold text-sm text-white leading-none">C</span>
+        <div
+          className="flex items-center justify-between h-16 px-5 shrink-0"
+          style={{ borderBottom: '1px solid var(--border)' }}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center"
+              style={{
+                background: 'var(--gold)',
+                boxShadow: '0 0 20px rgba(212,170,60,0.3)',
+              }}
+            >
+              <span
+                className="font-bold text-sm leading-none"
+                style={{ color: '#0a0905', fontFamily: 'var(--font-serif)' }}
+              >
+                C
+              </span>
             </div>
-            <span className="text-[15px] font-semibold tracking-tight text-white">Cogsly</span>
+            <div>
+              <span
+                className="text-sm font-bold tracking-wide"
+                style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-serif)', letterSpacing: '0.05em' }}
+              >
+                COGSLY
+              </span>
+              <p className="text-xs" style={{ color: 'var(--text-muted)', marginTop: '-2px' }}>F&amp;B Manager</p>
+            </div>
           </div>
           <button
             onClick={() => setSidebarOpen(false)}
-            className="lg:hidden p-1 text-zinc-500 hover:text-white"
+            className="lg:hidden p-1 rounded"
+            style={{ color: 'var(--text-muted)' }}
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-          <p className="px-3 pt-2 pb-3 text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">
-            Navigation
+        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto" style={{ paddingTop: '1rem' }}>
+          <p
+            className="px-3 pb-2 text-xs font-semibold uppercase tracking-widest"
+            style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}
+          >
+            Menu Utama
           </p>
           {navigation.map((item) => {
             const isActive =
@@ -81,56 +111,67 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
                 href={item.href}
                 onClick={() => setSidebarOpen(false)}
                 className={cn(
-                  'group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 relative',
-                  isActive
-                    ? 'bg-violet-500/10 text-white'
-                    : 'text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100'
+                  'group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 relative',
                 )}
+                style={{
+                  background: isActive ? 'var(--gold-muted)' : 'transparent',
+                  color: isActive ? 'var(--gold)' : 'var(--text-secondary)',
+                }}
+                onMouseEnter={e => {
+                  if (!isActive) {
+                    (e.currentTarget as HTMLElement).style.background = 'var(--gold-glow)';
+                    (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)';
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!isActive) {
+                    (e.currentTarget as HTMLElement).style.background = 'transparent';
+                    (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)';
+                  }
+                }}
               >
-                {/* Active indicator */}
                 {isActive && (
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-violet-500 rounded-r-full" />
+                  <span
+                    className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r-full"
+                    style={{ background: 'var(--gold)' }}
+                  />
                 )}
 
-                <item.icon
-                  className={cn(
-                    'w-4 h-4 shrink-0 transition-colors',
-                    isActive ? 'text-violet-400' : 'text-zinc-500 group-hover:text-zinc-300'
-                  )}
-                />
+                <item.icon className="w-4 h-4 shrink-0" style={{ color: isActive ? 'var(--gold)' : 'inherit' }} />
 
                 <div className="flex-1 min-w-0">
-                  <p
-                    className={cn(
-                      'text-sm font-medium leading-none',
-                      isActive ? 'text-white' : ''
-                    )}
-                  >
-                    {item.name}
-                  </p>
-                  <p className="text-[11px] text-zinc-600 mt-0.5 leading-none truncate">
+                  <p className="text-sm font-medium leading-none">{item.name}</p>
+                  <p className="text-xs mt-0.5 leading-none truncate" style={{ color: 'var(--text-muted)' }}>
                     {item.description}
                   </p>
                 </div>
-
-                {isActive && (
-                  <ChevronRight className="w-3 h-3 text-violet-500 shrink-0" />
-                )}
               </Link>
             );
           })}
         </nav>
 
         {/* Footer */}
-        <div className="p-4 border-t border-white/[0.06] shrink-0">
-          <div className="flex items-center gap-2.5 px-1">
-            <div className="w-6 h-6 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center">
-              <span className="text-[10px] font-bold text-zinc-400">F</span>
+        <div className="p-4 shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
+          <div
+            className="flex items-center gap-2.5 px-2 py-2 rounded-xl"
+            style={{ background: 'var(--gold-glow)' }}
+          >
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0"
+              style={{ background: 'var(--gold-muted)', color: 'var(--gold)' }}
+            >
+              F
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-medium text-zinc-300 leading-none truncate">F&amp;B Manager</p>
-              <p className="text-[10px] text-zinc-600 mt-0.5">Free plan</p>
+              <p className="text-xs font-semibold leading-none truncate" style={{ color: 'var(--text-primary)' }}>
+                F&amp;B Manager
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Paket Gratis</p>
             </div>
+            <div
+              className="ml-auto w-1.5 h-1.5 rounded-full shrink-0 pulse-dot"
+              style={{ background: 'var(--success)' }}
+            />
           </div>
         </div>
       </aside>
@@ -138,22 +179,31 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Mobile topbar */}
-        <header className="lg:hidden flex items-center justify-between h-14 px-4 bg-[#0f0f0f] border-b border-white/[0.06] shrink-0">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-violet-500 flex items-center justify-center shadow shadow-violet-500/30">
-              <span className="font-bold text-xs text-white">C</span>
+        <header
+          className="lg:hidden flex items-center justify-between h-14 px-4 shrink-0"
+          style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)' }}
+        >
+          <div className="flex items-center gap-2.5">
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center"
+              style={{ background: 'var(--gold)' }}
+            >
+              <span className="font-bold text-xs" style={{ color: '#0a0905', fontFamily: 'var(--font-serif)' }}>C</span>
             </div>
-            <span className="text-sm font-semibold text-white">Cogsly</span>
+            <span className="text-sm font-bold" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-serif)', letterSpacing: '0.05em' }}>
+              COGSLY
+            </span>
           </div>
           <button
             onClick={() => setSidebarOpen(true)}
-            className="p-1.5 text-zinc-400 hover:text-white hover:bg-white/[0.06] rounded-md transition-colors"
+            className="p-2 rounded-lg transition-colors"
+            style={{ color: 'var(--text-secondary)', background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}
           >
-            <Menu className="w-5 h-5" />
+            <Menu className="w-4 h-4" />
           </button>
         </header>
 
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        <main className="flex-1 overflow-y-auto relative z-10">{children}</main>
       </div>
     </div>
   );

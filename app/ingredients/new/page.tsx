@@ -1,151 +1,151 @@
+// app/ingredients/new/page.tsx
 import { supabase } from '@/lib/supabase';
 import { ArrowLeft, Save } from 'lucide-react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 export default function AddIngredientPage() {
-  
   async function createIngredient(formData: FormData) {
     'use server';
-    
     const name = (formData.get('name')?.toString() ?? '').trim();
     const category = (formData.get('category')?.toString() ?? '').trim();
     const unit = (formData.get('unit')?.toString() ?? '').trim();
     const lowStockRaw = formData.get('low_stock_threshold')?.toString() ?? '0';
     const low_stock_threshold = Number(lowStockRaw);
 
-    if (!name) throw new Error('Ingredient name is required.');
-    if (!category) throw new Error('Category is required.');
-    if (!unit) throw new Error('Unit is required.');
+    if (!name) throw new Error('Nama bahan wajib diisi.');
+    if (!category) throw new Error('Kategori wajib dipilih.');
+    if (!unit) throw new Error('Satuan wajib dipilih.');
     if (!Number.isFinite(low_stock_threshold) || low_stock_threshold < 0) {
-      throw new Error('Low stock threshold must be a valid non-negative number.');
+      throw new Error('Ambang batas stok harus angka non-negatif yang valid.');
     }
 
-    const { error } = await supabase
-      .from('ingredients')
-      .insert([
-        {
-          name,
-          category,
-          unit,
-          low_stock_threshold,
-          stock: 0,
-          average_price: 0
-        }
-      ]);
+    const { error } = await supabase.from('ingredients').insert([{
+      name, category, unit, low_stock_threshold, stock: 0, average_price: 0
+    }]);
 
-    if (error) {
-       console.error("Error creating ingredient:", error);
-       throw new Error(error.message);
-    }
-
+    if (error) throw new Error(error.message);
     redirect('/ingredients');
   }
 
+  return <IngredientForm action={createIngredient} mode="create" />;
+}
+
+// Shared form component
+function IngredientForm({
+  action,
+  mode,
+  defaultValues,
+}: {
+  action: (formData: FormData) => Promise<void>;
+  mode: 'create' | 'edit';
+  defaultValues?: { name: string; category: string; unit: string; low_stock_threshold: string };
+}) {
   return (
-    <div className="p-8 max-w-3xl mx-auto space-y-8">
+    <div className="p-6 lg:p-8 max-w-2xl mx-auto space-y-8">
+      {/* Header */}
       <div className="flex items-center gap-4">
-        <Link 
-          href="/ingredients" 
-          className="w-10 h-10 rounded-xl bg-[#111] border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+        <Link
+          href="/ingredients"
+          className="w-10 h-10 rounded-xl flex items-center justify-center transition-all btn-ghost"
+          style={{ padding: 0 }}
         >
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeft className="w-4.5 h-4.5" style={{ width: '18px', height: '18px' }} />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white mb-1">Add New Ingredient</h1>
-          <p className="text-zinc-500 text-sm">Register a new raw material to your master list.</p>
+          <p
+            className="text-xs font-semibold uppercase tracking-widest mb-1"
+            style={{ color: 'var(--gold)', fontFamily: 'DM Mono, monospace' }}
+          >
+            ◆ Inventori
+          </p>
+          <h1
+            className="text-2xl font-bold"
+            style={{ color: 'var(--text-primary)', fontFamily: 'DM Serif Display, serif' }}
+          >
+            {mode === 'create' ? 'Tambah Bahan Baku' : 'Edit Bahan Baku'}
+          </h1>
         </div>
       </div>
 
-      <div className="bg-[#111] border border-zinc-800 rounded-2xl p-6 md:p-8">
-        <form action={createIngredient} className="space-y-6">
-          <div className="space-y-4">
-            
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-zinc-300 mb-1.5">
-                Ingredient Name
-              </label>
-              <input 
-                type="text" 
-                id="name" 
-                name="name" 
-                required 
-                placeholder="e.g. Arabica Coffee Beans"
-                className="w-full bg-[#1a1a1a] border border-zinc-800 rounded-xl py-2.5 px-4 text-white placeholder-zinc-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="category" className="block text-sm font-medium text-zinc-300 mb-1.5">
-                  Category
-                </label>
-                <select 
-                  id="category" 
-                  name="category" 
-                  required
-                  className="w-full bg-[#1a1a1a] border border-zinc-800 rounded-xl py-2.5 px-4 text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all appearance-none"
-                >
-                  <option value="Beans">Beans / Coffee</option>
-                  <option value="Dairy">Dairy</option>
-                  <option value="Syrup">Syrup</option>
-                  <option value="Packaging">Packaging</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-
-              <div>
-                 <label htmlFor="unit" className="block text-sm font-medium text-zinc-300 mb-1.5">
-                  Unit of Measurement (UoM)
-                </label>
-                <select 
-                  id="unit" 
-                  name="unit" 
-                  required
-                  className="w-full bg-[#1a1a1a] border border-zinc-800 rounded-xl py-2.5 px-4 text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all appearance-none"
-                >
-                  <option value="gr">Grams (gr)</option>
-                  <option value="kg">Kilograms (kg)</option>
-                  <option value="ml">Milliliters (ml)</option>
-                  <option value="pcs">Pieces (pcs)</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="low_stock_threshold" className="block text-sm font-medium text-zinc-300 mb-1.5">
-                Low Stock Alert Threshold
-              </label>
-              <div className="relative">
-                <input 
-                  type="number" 
-                  id="low_stock_threshold" 
-                  name="low_stock_threshold" 
-                  required 
-                  min="0"
-                  step="0.01"
-                  defaultValue="0"
-                  className="w-full bg-[#1a1a1a] border border-zinc-800 rounded-xl py-2.5 px-4 text-white placeholder-zinc-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
-                />
-                <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
-                  <span className="text-zinc-500 text-sm">units</span>
-                </div>
-              </div>
-              <p className="mt-1.5 text-xs text-zinc-500">
-                You will be alerted when stock falls below this amount.
-              </p>
-            </div>
-
+      <div className="rounded-2xl p-6 md:p-8 space-y-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+        <form action={action} className="space-y-5">
+          {/* Name */}
+          <div>
+            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+              Nama Bahan
+            </label>
+            <input
+              type="text"
+              name="name"
+              required
+              placeholder="cth. Biji Kopi Arabika"
+              defaultValue={defaultValues?.name}
+              className="input-base"
+            />
           </div>
 
-          <div className="pt-4 border-t border-zinc-800 flex justify-end">
-             <button 
-                type="submit"
-                className="inline-flex items-center gap-2 bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-medium transition-colors"
-             >
-               <Save className="w-5 h-5" />
-               Save Ingredient
-             </button>
+          {/* Category + Unit */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                Kategori
+              </label>
+              <select name="category" required defaultValue={defaultValues?.category} className="input-base" style={{ appearance: 'none' }}>
+                <option value="Beans">Biji Kopi</option>
+                <option value="Dairy">Susu & Dairy</option>
+                <option value="Syrup">Sirup</option>
+                <option value="Packaging">Kemasan</option>
+                <option value="Other">Lainnya</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                Satuan (UoM)
+              </label>
+              <select name="unit" required defaultValue={defaultValues?.unit} className="input-base" style={{ appearance: 'none' }}>
+                <option value="gr">Gram (gr)</option>
+                <option value="kg">Kilogram (kg)</option>
+                <option value="ml">Mililiter (ml)</option>
+                <option value="pcs">Buah/Pcs</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Threshold */}
+          <div>
+            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+              Ambang Batas Stok Minimum
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                name="low_stock_threshold"
+                required
+                min="0"
+                step="0.01"
+                defaultValue={defaultValues?.low_stock_threshold ?? '0'}
+                className="input-base"
+                style={{ paddingRight: '4rem' }}
+              />
+              <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>satuan</span>
+              </div>
+            </div>
+            <p className="mt-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+              Peringatan akan muncul jika stok di bawah angka ini.
+            </p>
+          </div>
+
+          {/* Footer */}
+          <div className="pt-4 flex justify-between items-center" style={{ borderTop: '1px solid var(--border)' }}>
+            <Link href="/ingredients" className="btn-ghost text-sm">
+              Batal
+            </Link>
+            <button type="submit" className="btn-primary">
+              <Save className="w-4 h-4" />
+              {mode === 'create' ? 'Simpan Bahan' : 'Simpan Perubahan'}
+            </button>
           </div>
         </form>
       </div>

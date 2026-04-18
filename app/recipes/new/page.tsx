@@ -29,56 +29,42 @@ export default async function NewRecipePage() {
 
   async function submitRecipe(data: SubmitRecipeInput) {
     'use server';
-
-    // 1. Insert product
     const { data: productData, error: productError } = await supabase
       .from('products')
-      .insert([{
-        name: data.name,
-        price: data.price,
-        operational_cost_buffer: data.operational_cost_buffer,
-        is_percentage_buffer: data.is_percentage_buffer
-      }])
+      .insert([{ name: data.name, price: data.price, operational_cost_buffer: data.operational_cost_buffer, is_percentage_buffer: data.is_percentage_buffer }])
       .select()
       .single();
 
-    if (productError || !productData) {
-      throw new Error("Failed to create product");
-    }
+    if (productError || !productData) throw new Error('Gagal membuat produk');
 
-    // 2. Insert recipe items
     const recipeItems = data.items.map((item) => ({
       product_id: productData.id,
       ingredient_id: item.ingredient_id,
       amount_required: item.amount_required
     }));
 
-    const { error: itemsError } = await supabase
-      .from('recipe_items')
-      .insert(recipeItems);
-
-    if (itemsError) {
-      // In a real app we'd rollback product creation or use an RPC/Transaction
-      throw new Error("Failed to add recipe items");
-    }
-
+    const { error: itemsError } = await supabase.from('recipe_items').insert(recipeItems);
+    if (itemsError) throw new Error('Gagal menambahkan bahan resep');
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8">
+    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-8">
       <div className="flex items-center gap-4">
-        <Link 
-          href="/recipes" 
-          className="w-10 h-10 rounded-xl bg-[#111] border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
+        <Link href="/recipes" className="btn-ghost" style={{ padding: '0.5rem', borderRadius: '10px' }}>
+          <ArrowLeft style={{ width: '18px', height: '18px' }} />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white mb-1">Recipe Builder & HPP</h1>
-          <p className="text-zinc-500 text-sm">Create a new product by combining ingredients. HPP will calculate automatically.</p>
+          <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--gold)', fontFamily: 'DM Mono, monospace' }}>
+            ◆ Resep & HPP
+          </p>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)', fontFamily: 'DM Serif Display, serif' }}>
+            Buat Resep Baru
+          </h1>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+            Kombinasikan bahan baku dan hitung HPP secara otomatis
+          </p>
         </div>
       </div>
-
       <RecipeBuilderForm ingredients={ingredients || []} submitRecipe={submitRecipe} />
     </div>
   );

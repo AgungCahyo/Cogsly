@@ -1,21 +1,31 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { DM_Serif_Display, DM_Mono, Instrument_Sans } from "next/font/google";
 import "./globals.css";
 import { LayoutShell } from "@/components/LayoutShell";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const dmSerif = DM_Serif_Display({
   subsets: ["latin"],
+  weight: ["400"],
+  style: ["normal", "italic"],
+  variable: "--font-dm-serif",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const dmMono = DM_Mono({
   subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-dm-mono",
+});
+
+const instrumentSans = Instrument_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  style: ["normal", "italic"],
+  variable: "--font-instrument",
 });
 
 export const metadata: Metadata = {
-  title: "Cogsly - F&B POS and Inventory",
-  description: "Smart Point of Sale and Inventory Management for F&B",
+  title: "Cogsly — Manajemen F&B",
+  description: "Point of Sale & Manajemen Inventori Cerdas untuk Bisnis F&B",
 };
 
 export default function RootLayout({
@@ -24,11 +34,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
-    >
-      <body className="min-h-full flex flex-col">
+    <html lang="id" className="h-full">
+      <body className={`${instrumentSans.variable} ${dmSerif.variable} ${dmMono.variable} min-h-full flex flex-col font-sans`}>
         <LayoutShell>{children}</LayoutShell>
       </body>
     </html>

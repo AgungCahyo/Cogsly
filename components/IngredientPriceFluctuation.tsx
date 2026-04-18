@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { PriceChart } from './PriceChart';
+import { TrendingUp } from 'lucide-react';
 
 type IngredientOption = {
   id: string;
@@ -36,18 +37,14 @@ export function IngredientPriceFluctuation({
 
   useEffect(() => {
     let cancelled = false;
-
     async function run() {
       if (!ingredientId) return;
-
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`/api/purchases?ingredient_id=${encodeURIComponent(ingredientId)}`, {
-          cache: 'no-store',
-        });
+        const res = await fetch(`/api/purchases?ingredient_id=${encodeURIComponent(ingredientId)}`, { cache: 'no-store' });
         const json: { data?: PurchasePoint[]; error?: string } = await res.json();
-        if (!res.ok) throw new Error(json.error || 'Failed to load purchases');
+        if (!res.ok) throw new Error(json.error || 'Gagal memuat data pembelian');
         if (!cancelled) setData(json.data ?? []);
       } catch (e: unknown) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
@@ -55,17 +52,17 @@ export function IngredientPriceFluctuation({
         if (!cancelled) setLoading(false);
       }
     }
-
     run();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [ingredientId]);
 
   if (!ingredients.length) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-center">
-        <p className="text-zinc-500 text-sm mt-2">Add ingredients first to see price trends.</p>
+        <TrendingUp className="w-8 h-8 mb-2 opacity-20" style={{ color: 'var(--text-muted)' }} />
+        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+          Tambahkan bahan baku terlebih dahulu untuk melihat tren harga.
+        </p>
       </div>
     );
   }
@@ -74,37 +71,39 @@ export function IngredientPriceFluctuation({
     <div className="flex flex-col gap-4 h-full">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-zinc-300">Ingredient</p>
-          <p className="text-xs text-zinc-500">Chart shows price per unit for the selected ingredient.</p>
+          <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Pilih Bahan</p>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            Grafik menampilkan harga per satuan berdasarkan riwayat pembelian.
+          </p>
         </div>
-
         <div className="flex items-center gap-3">
           <select
             value={ingredientId ?? ''}
             onChange={(e) => setIngredientId(e.target.value || null)}
-            className="bg-[#1a1a1a] border border-zinc-800 rounded-xl py-2 px-3 text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all appearance-none"
+            className="input-base"
+            style={{ width: 'auto', minWidth: '160px' }}
           >
             {ingredients.map((ing) => (
-              <option key={ing.id} value={ing.id}>
-                {ing.name}
-              </option>
+              <option key={ing.id} value={ing.id}>{ing.name}</option>
             ))}
           </select>
-
-          {loading && <span className="text-xs text-zinc-500">Loading…</span>}
+          {loading && (
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Memuat…</span>
+          )}
         </div>
       </div>
 
       {error ? (
         <div className="flex-1 flex items-center justify-center text-center">
-          <p className="text-rose-400 text-sm">{error}</p>
+          <p className="text-sm" style={{ color: 'var(--danger)' }}>{error}</p>
         </div>
       ) : (
         <div className="flex-1 w-full">
           {data.length === 0 && !loading ? (
             <div className="h-full flex flex-col items-center justify-center text-center">
-              <p className="text-zinc-500 text-sm">
-                No purchase logs for this ingredient yet.
+              <TrendingUp className="w-8 h-8 mb-2 opacity-20" style={{ color: 'var(--text-muted)' }} />
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                Belum ada log pembelian untuk bahan ini.
               </p>
             </div>
           ) : (
@@ -115,4 +114,3 @@ export function IngredientPriceFluctuation({
     </div>
   );
 }
-

@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
-import { Wallet, TrendingUp, PackageSearch, ArrowUpRight, Activity } from "lucide-react";
+import { Wallet, TrendingUp, PackageSearch, AlertTriangle, Activity, ArrowUpRight, ChevronRight } from "lucide-react";
 import { IngredientPriceFluctuation } from '@/components/IngredientPriceFluctuation';
+import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,15 +57,7 @@ export default async function Dashboard() {
 
   const { data: products } = await supabase
     .from('products')
-    .select(`
-      price,
-      operational_cost_buffer,
-      is_percentage_buffer,
-      recipe_items (
-        amount_required,
-        ingredients (average_price)
-      )
-    `)
+    .select(`price, operational_cost_buffer, is_percentage_buffer, recipe_items(amount_required, ingredients(average_price))`)
     .returns<ProductRow[]>();
 
   let totalMarkupPercent = 0;
@@ -117,83 +110,150 @@ export default async function Dashboard() {
 
   const stats = [
     {
-      label: 'Asset Value',
-      sublabel: 'Total stock in hand',
+      label: 'Nilai Aset',
+      sublabel: 'Total stok tersedia',
       value: `Rp ${Math.round(totalAssetValue).toLocaleString('id-ID')}`,
       icon: Wallet,
-      iconBg: 'bg-violet-500/10',
-      iconColor: 'text-violet-400',
-      borderHover: 'hover:border-violet-500/30',
-      valueColor: 'text-white',
+      accentColor: 'var(--gold)',
+      accentBg: 'var(--gold-muted)',
+      href: '/ingredients',
     },
     {
-      label: 'Est. Profit Projection',
-      sublabel: `Avg markup ${(avgMarkup * 100).toFixed(1)}%`,
+      label: 'Estimasi Laba',
+      sublabel: `Rata-rata markup ${(avgMarkup * 100).toFixed(1)}%`,
       value: `Rp ${Math.round(profitProjection).toLocaleString('id-ID')}`,
       icon: TrendingUp,
-      iconBg: 'bg-emerald-500/10',
-      iconColor: 'text-emerald-400',
-      borderHover: 'hover:border-emerald-500/30',
-      valueColor: 'text-white',
+      accentColor: 'var(--success)',
+      accentBg: 'var(--success-dim)',
+      href: '/recipes',
     },
     {
-      label: 'Low Stock Alerts',
-      sublabel:
-        lowStockCount > 0
-          ? lowStockItems.slice(0, 2).join(', ') + (lowStockItems.length > 2 ? '…' : '')
-          : 'All items stocked',
-      value: `${lowStockCount} Items`,
-      icon: PackageSearch,
-      iconBg: lowStockCount > 0 ? 'bg-rose-500/10' : 'bg-zinc-800',
-      iconColor: lowStockCount > 0 ? 'text-rose-400' : 'text-zinc-500',
-      borderHover: 'hover:border-rose-500/30',
-      valueColor: lowStockCount > 0 ? 'text-rose-400' : 'text-white',
+      label: 'Stok Menipis',
+      sublabel: lowStockCount > 0
+        ? lowStockItems.slice(0, 2).join(', ') + (lowStockItems.length > 2 ? '…' : '')
+        : 'Semua stok aman',
+      value: `${lowStockCount} Item`,
+      icon: lowStockCount > 0 ? AlertTriangle : PackageSearch,
+      accentColor: lowStockCount > 0 ? 'var(--danger)' : 'var(--text-muted)',
+      accentBg: lowStockCount > 0 ? 'var(--danger-dim)' : 'rgba(74,67,48,0.2)',
+      href: '/ingredients',
     },
   ];
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-8">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between pt-2">
         <div>
-          <p className="text-xs font-medium text-zinc-500 uppercase tracking-widest mb-1">Overview</p>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Business Intelligence</h1>
+          <p
+            className="text-xs font-semibold uppercase tracking-widest mb-2"
+            style={{ color: 'var(--gold)', fontFamily: 'var(--font-mono)' }}
+          >
+            ◆ Dasbor Utama
+          </p>
+          <h1
+            className="text-3xl font-bold leading-tight"
+            style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-serif)' }}
+          >
+            Intelijen Bisnis
+          </h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+            Pantau performa dan kesehatan stok secara real-time
+          </p>
         </div>
-        <div className="flex items-center gap-1.5 text-xs text-zinc-500 bg-white/[0.04] border border-white/[0.08] px-3 py-1.5 rounded-lg">
-          <Activity className="w-3 h-3 text-emerald-400" />
-          Live data
+        <div
+          className="hidden sm:flex items-center gap-2 text-xs px-3 py-2 rounded-lg"
+          style={{
+            border: '1px solid var(--border)',
+            background: 'var(--bg-card)',
+            color: 'var(--text-secondary)',
+          }}
+        >
+          <span className="w-1.5 h-1.5 rounded-full pulse-dot" style={{ background: 'var(--success)' }} />
+          <Activity className="w-3 h-3" />
+          Data langsung
         </div>
       </div>
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {stats.map(({ label, sublabel, value, icon: Icon, iconBg, iconColor, valueColor, borderHover }) => (
-          <div
+        {stats.map(({ label, sublabel, value, icon: Icon, accentColor, accentBg, href }) => (
+          <Link
             key={label}
-            className={`group relative bg-[#111] border border-white/[0.06] rounded-2xl p-5 transition-all duration-200 ${borderHover} hover:bg-[#141414]`}
+            href={href}
+            className="group block rounded-2xl p-5 card-interactive"
           >
-            <div className="flex items-start justify-between mb-4">
-              <div className={`w-9 h-9 ${iconBg} rounded-xl flex items-center justify-center`}>
-                <Icon className={`w-4 h-4 ${iconColor}`} />
+            <div className="flex items-start justify-between mb-5">
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ background: accentBg }}
+              >
+                <Icon className="w-4.5 h-4.5" style={{ color: accentColor, width: '18px', height: '18px' }} />
               </div>
-              <ArrowUpRight className="w-3.5 h-3.5 text-zinc-700 group-hover:text-zinc-500 transition-colors" />
+              <ArrowUpRight
+                className="w-4 h-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                style={{ color: 'var(--text-muted)' }}
+              />
             </div>
-            <p className="text-[13px] font-medium text-zinc-400 mb-1">{label}</p>
-            <p className={`text-2xl font-bold tracking-tight ${valueColor} mb-1`}>{value}</p>
-            <p className="text-[11px] text-zinc-600 truncate">{sublabel}</p>
-          </div>
+            <p className="text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>{label}</p>
+            <p
+              className="text-2xl font-bold tracking-tight mb-1 stat-number"
+              style={{ color: accentColor }}
+            >
+              {value}
+            </p>
+            <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{sublabel}</p>
+          </Link>
+        ))}
+      </div>
+
+      {/* Quick actions */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'Tambah Bahan', href: '/ingredients/new', desc: 'Daftarkan bahan baku baru' },
+          { label: 'Catat Pembelian', href: '/procurement/new', desc: 'Log pengadaan material' },
+          { label: 'Buat Resep', href: '/recipes/new', desc: 'Hitung HPP produk baru' },
+          { label: 'Buka Kasir', href: '/pos', desc: 'Mulai proses transaksi' },
+        ].map(item => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className="group p-4 rounded-xl card-interactive"
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{item.label}</p>
+              <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" style={{ color: 'var(--gold)' }} />
+            </div>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{item.desc}</p>
+          </Link>
         ))}
       </div>
 
       {/* Chart */}
-      <div className="bg-[#111] border border-white/[0.06] rounded-2xl overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
+      <div
+        className="rounded-2xl overflow-hidden"
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+      >
+        <div
+          className="flex items-center justify-between px-6 py-5"
+          style={{ borderBottom: '1px solid var(--border)' }}
+        >
           <div>
-            <h2 className="text-sm font-semibold text-white">Ingredient Price Fluctuation</h2>
-            <p className="text-[11px] text-zinc-500 mt-0.5">Price per unit over time based on purchase history</p>
+            <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+              Fluktuasi Harga Bahan
+            </h2>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+              Harga per satuan berdasarkan riwayat pembelian
+            </p>
           </div>
+          <span
+            className="text-xs px-2.5 py-1 rounded-lg mono-font"
+            style={{ background: 'var(--gold-muted)', color: 'var(--gold)', border: '1px solid rgba(212,170,60,0.2)' }}
+          >
+            30 transaksi terakhir
+          </span>
         </div>
-        <div className="p-6 min-h-[360px] flex flex-col">
+        <div className="p-6 min-h-[380px] flex flex-col">
           <IngredientPriceFluctuation
             ingredients={ingredientOptions || []}
             initialIngredientId={initialIngredientId}

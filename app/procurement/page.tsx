@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { ShoppingCart, Plus, FileText, ExternalLink, Calendar } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
+import { id } from 'date-fns/locale';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,103 +19,137 @@ type PurchaseLogRow = {
 export default async function ProcurementPage() {
   const { data: purchases, error } = await supabase
     .from('purchases')
-    .select(`
-      id,
-      date,
-      supplier,
-      price,
-      quantity,
-      evidence_url,
-      ingredients (
-        name,
-        unit
-      )
-    `)
+    .select(`id, date, supplier, price, quantity, evidence_url, ingredients(name, unit)`)
     .returns<PurchaseLogRow[]>()
     .order('date', { ascending: false });
 
+  const totalSpend = purchases?.reduce((s, p) => s + Number(p.price), 0) ?? 0;
+  const totalTransaksi = purchases?.length ?? 0;
+
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8">
+    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-8">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Procurement Logs</h1>
-          <p className="text-zinc-400">Track all your material purchases and maintain transparent records.</p>
+          <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--gold)', fontFamily: 'DM Mono, monospace' }}>
+            ◆ Pengadaan
+          </p>
+          <h1 className="text-3xl font-bold" style={{ color: 'var(--text-primary)', fontFamily: 'DM Serif Display, serif' }}>
+            Log Pembelian
+          </h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+            Catat semua pengadaan material dan pertahankan transparansi pengeluaran
+          </p>
         </div>
-        <Link 
-          href="/procurement/new" 
-          className="inline-flex items-center gap-2 bg-indigo-500 hover:bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-medium transition-colors cursor-pointer"
-        >
-          <Plus className="w-5 h-5" />
-          Record Purchase
+        <Link href="/procurement/new" className="btn-primary">
+          <Plus className="w-4 h-4" />
+          Catat Pembelian
         </Link>
       </div>
 
-      <div className="bg-[#111] border border-zinc-800 rounded-2xl overflow-hidden">
+      {/* Summary */}
+      {!error && purchases && purchases.length > 0 && (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="p-4 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+            <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Total Transaksi</p>
+            <p className="text-2xl font-bold stat-number" style={{ color: 'var(--text-primary)' }}>{totalTransaksi}</p>
+          </div>
+          <div className="p-4 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+            <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Total Pengeluaran</p>
+            <p className="text-2xl font-bold stat-number" style={{ color: 'var(--gold)' }}>
+              Rp {totalSpend.toLocaleString('id-ID')}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Table */}
+      <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+        <div className="px-6 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
+          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Riwayat Pengadaan</p>
+        </div>
+
         {error ? (
-           <div className="p-8 text-center text-rose-400">Failed to load logs: {error.message}</div>
+          <div className="p-8 text-center" style={{ color: 'var(--danger)' }}>Gagal memuat data: {error.message}</div>
         ) : !purchases || purchases.length === 0 ? (
           <div className="p-16 flex flex-col items-center justify-center text-center">
-            <div className="w-16 h-16 bg-zinc-900 rounded-2xl flex items-center justify-center mb-4">
-              <ShoppingCart className="w-8 h-8 text-zinc-600" />
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}>
+              <ShoppingCart className="w-7 h-7" style={{ color: 'var(--text-muted)' }} />
             </div>
-            <h3 className="text-lg font-medium text-white mb-1">No purchases recorded</h3>
-            <p className="text-zinc-500 mb-6 max-w-sm">When you buy materials, record them here. The system will automatically calculate average item costs (HPP) and update your stock.</p>
-            <Link 
-              href="/procurement/new" 
-              className="inline-flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors"
-            >
-              Record First Purchase
+            <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)', fontFamily: 'DM Serif Display, serif' }}>
+              Belum ada pembelian
+            </h3>
+            <p className="text-sm mb-6 max-w-sm" style={{ color: 'var(--text-secondary)' }}>
+              Catat setiap pembelian material di sini. Sistem akan otomatis menghitung HPP rata-rata dan memperbarui stok.
+            </p>
+            <Link href="/procurement/new" className="btn-ghost text-sm">
+              Catat Pertama
             </Link>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full whitespace-nowrap text-left text-sm">
-              <thead className="bg-[#1a1a1a] text-zinc-400">
-                <tr>
-                  <th className="px-6 py-4 font-medium rounded-tl-2xl">Date</th>
-                  <th className="px-6 py-4 font-medium">Ingredient</th>
-                  <th className="px-6 py-4 font-medium">Supplier</th>
-                  <th className="px-6 py-4 font-medium text-right">Quantity</th>
-                  <th className="px-6 py-4 font-medium text-right">Total Price</th>
-                  <th className="px-6 py-4 font-medium rounded-tr-2xl text-center">Receipt</th>
+              <thead>
+                <tr style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border)' }}>
+                  {['Tanggal', 'Bahan', 'Pemasok', 'Jumlah', 'Total Harga', 'Bukti'].map(h => (
+                    <th key={h} className="px-6 py-3.5 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800">
-                {purchases.map((log) => (
-                  <tr key={log.id} className="hover:bg-zinc-800/20 transition-colors">
-                    <td className="px-6 py-4 text-zinc-300">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-zinc-500" />
-                        {format(new Date(log.date), 'dd MMM yyyy, HH:mm')}
+              <tbody>
+                {purchases.map((log, idx) => (
+                  <tr
+                    key={log.id}
+                    className="table-row-hover transition-colors"
+                    style={{ borderBottom: idx < purchases.length - 1 ? '1px solid var(--border)' : 'none' }}
+                  >
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
+                        <Calendar className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--text-muted)' }} />
+                        <span className="text-sm">{format(new Date(log.date), 'dd MMM yyyy', { locale: id })}</span>
                       </div>
+                      <p className="text-xs mt-0.5 ml-5.5" style={{ color: 'var(--text-muted)' }}>
+                        {format(new Date(log.date), 'HH:mm')}
+                      </p>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="font-medium text-white">{log.ingredients?.name}</span>
+                      <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        {log.ingredients?.name}
+                      </span>
                     </td>
-                    <td className="px-6 py-4 text-zinc-400">
-                      {log.supplier}
+                    <td className="px-6 py-4">
+                      <span
+                        className="text-xs px-2.5 py-1 rounded-md"
+                        style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                      >
+                        {log.supplier ?? '—'}
+                      </span>
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <span className="text-zinc-100 font-medium">{log.quantity}</span>
-                      <span className="text-zinc-500 ml-1">{log.ingredients?.unit}</span>
+                    <td className="px-6 py-4">
+                      <span className="font-semibold stat-number" style={{ color: 'var(--text-primary)' }}>{log.quantity}</span>
+                      <span className="text-xs ml-1" style={{ color: 'var(--text-muted)' }}>{log.ingredients?.unit}</span>
                     </td>
-                    <td className="px-6 py-4 text-right font-medium text-white">
-                      Rp {Number(log.price).toLocaleString('id-ID')}
+                    <td className="px-6 py-4">
+                      <span className="font-semibold stat-number" style={{ color: 'var(--gold)' }}>
+                        Rp {Number(log.price).toLocaleString('id-ID')}
+                      </span>
                     </td>
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-6 py-4">
                       {log.evidence_url ? (
-                        <a 
-                          href={log.evidence_url} 
-                          target="_blank" 
+                        <a
+                          href={log.evidence_url}
+                          target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center justify-center p-2 rounded-lg bg-zinc-800/50 hover:bg-zinc-700 text-indigo-400 transition-colors group"
-                          title="View Receipt"
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg transition-all"
+                          style={{ background: 'var(--gold-muted)', color: 'var(--gold)', border: '1px solid rgba(212,170,60,0.2)' }}
+                          title="Lihat Bukti"
                         >
-                          <FileText className="w-4 h-4 group-hover:hidden" />
-                          <ExternalLink className="w-4 h-4 hidden group-hover:block" />
+                          <FileText className="w-3.5 h-3.5" />
                         </a>
                       ) : (
-                        <span className="text-zinc-600 italic text-xs">No file</span>
+                        <span className="text-xs italic" style={{ color: 'var(--text-muted)' }}>—</span>
                       )}
                     </td>
                   </tr>

@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { PackagePlus, Search, AlertCircle, CheckCircle2, Pencil } from 'lucide-react';
+import { PackagePlus, AlertTriangle, CheckCircle2, Pencil, Package } from 'lucide-react';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -10,122 +10,208 @@ export default async function IngredientsPage() {
     .select('*')
     .order('name');
 
+  const totalItems = ingredients?.length ?? 0;
+  const lowStockItems = ingredients?.filter(i => Number(i.stock) <= Number(i.low_stock_threshold)) ?? [];
+
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8">
+    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-8">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Ingredients Master</h1>
-          <p className="text-zinc-400">Manage your raw materials and track stock levels in real-time.</p>
+          <p
+            className="text-xs font-semibold uppercase tracking-widest mb-2"
+            style={{ color: 'var(--gold)', fontFamily: 'var(--font-mono)' }}
+          >
+            ◆ Inventori
+          </p>
+          <h1
+            className="text-3xl font-bold"
+            style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-serif)' }}
+          >
+            Bahan Baku
+          </h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+            Kelola material dan pantau level stok secara real-time
+          </p>
         </div>
-        <Link 
-          href="/ingredients/new" 
-          className="inline-flex items-center gap-2 bg-indigo-500 hover:bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-medium transition-colors"
-        >
-          <PackagePlus className="w-5 h-5" />
-          Add Ingredient
+        <Link href="/ingredients/new" className="btn-primary">
+          <PackagePlus className="w-4 h-4" />
+          Tambah Bahan
         </Link>
       </div>
 
-      <div className="bg-[#111] border border-zinc-800 rounded-2xl overflow-hidden">
-        <div className="p-4 border-b border-zinc-800 flex items-center gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
-            <input 
-              type="text" 
-              placeholder="Search ingredients..." 
-              className="w-full bg-[#1a1a1a] border border-zinc-800 rounded-xl py-2 pl-10 pr-4 text-white placeholder-zinc-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
-            />
-          </div>
+      {/* Summary strip */}
+      {!error && ingredients && ingredients.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: 'Total Bahan', value: totalItems, color: 'var(--text-primary)' },
+            { label: 'Stok Aman', value: totalItems - lowStockItems.length, color: 'var(--success)' },
+            { label: 'Stok Menipis', value: lowStockItems.length, color: lowStockItems.length > 0 ? 'var(--danger)' : 'var(--text-secondary)' },
+            { label: 'Kategori', value: new Set(ingredients.map(i => i.category)).size, color: 'var(--gold)' },
+          ].map(s => (
+            <div
+              key={s.label}
+              className="p-4 rounded-xl"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+            >
+              <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
+              <p className="text-2xl font-bold stat-number" style={{ color: s.color }}>{s.value}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Table */}
+      <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+        {/* Table header bar */}
+        <div
+          className="px-6 py-4 flex items-center justify-between"
+          style={{ borderBottom: '1px solid var(--border)' }}
+        >
+          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+            Daftar Bahan Baku
+          </p>
+          {lowStockItems.length > 0 && (
+            <span className="badge badge-danger">
+              <AlertTriangle className="w-3 h-3" />
+              {lowStockItems.length} stok menipis
+            </span>
+          )}
         </div>
 
         {error ? (
-           <div className="p-8 text-center text-rose-400 flex flex-col items-center gap-2">
-             <AlertCircle className="w-8 h-8" />
-             <p>Failed to load ingredients. Did you run the database setup script?</p>
-             <p className="text-sm opacity-80">{error.message}</p>
-           </div>
+          <div className="p-12 text-center flex flex-col items-center gap-3">
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center"
+              style={{ background: 'var(--danger-dim)' }}
+            >
+              <AlertTriangle className="w-6 h-6" style={{ color: 'var(--danger)' }} />
+            </div>
+            <p className="font-medium" style={{ color: 'var(--danger)' }}>Gagal memuat data</p>
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{error.message}</p>
+          </div>
         ) : !ingredients || ingredients.length === 0 ? (
           <div className="p-16 flex flex-col items-center justify-center text-center">
-            <div className="w-16 h-16 bg-zinc-900 rounded-2xl flex items-center justify-center mb-4">
-              <PackagePlus className="w-8 h-8 text-zinc-600" />
-            </div>
-            <h3 className="text-lg font-medium text-white mb-1">No ingredients yet</h3>
-            <p className="text-zinc-500 mb-6 max-w-sm">Start by adding your first raw material. This will allow you to track stock and calculate recipe costs.</p>
-            <Link 
-              href="/ingredients/new" 
-              className="inline-flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+            <div
+              className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
+              style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}
             >
-              Add New
+              <Package className="w-7 h-7" style={{ color: 'var(--text-muted)' }} />
+            </div>
+            <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-serif)' }}>
+              Belum ada bahan baku
+            </h3>
+            <p className="text-sm mb-6 max-w-sm" style={{ color: 'var(--text-secondary)' }}>
+              Mulai dengan menambahkan bahan pertama Anda. Ini memungkinkan pelacakan stok dan perhitungan HPP resep.
+            </p>
+            <Link href="/ingredients/new" className="btn-ghost text-sm">
+              Tambah Sekarang
             </Link>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full whitespace-nowrap text-left text-sm">
-              <thead className="bg-[#1a1a1a] text-zinc-400">
-                <tr>
-                  <th className="px-6 py-4 font-medium rounded-tl-2xl">Name</th>
-                  <th className="px-6 py-4 font-medium">Category</th>
-                  <th className="px-6 py-4 font-medium">Stock Level</th>
-                  <th className="px-6 py-4 font-medium">Avg. Price</th>
-                  <th className="px-6 py-4 font-medium rounded-tr-2xl">Status</th>
+              <thead>
+                <tr style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border)' }}>
+                  {['Nama Bahan', 'Kategori', 'Level Stok', 'Harga Rata-rata', 'Status', ''].map(h => (
+                    <th
+                      key={h}
+                      className="px-6 py-3.5 text-xs font-semibold uppercase tracking-wider"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800">
-                {ingredients.map((item) => {
+              <tbody>
+                {ingredients.map((item, idx) => {
                   const isLowStock = Number(item.stock) <= Number(item.low_stock_threshold);
                   return (
-                    <tr key={item.id} className="hover:bg-zinc-800/20 transition-colors">
+                    <tr
+                      key={item.id}
+                      className="table-row-hover transition-colors"
+                      style={{ borderBottom: idx < ingredients.length - 1 ? '1px solid var(--border)' : 'none' }}
+                    >
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className={/* Smart styling for initial */ `w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs ${
-                            isLowStock ? 'bg-rose-500/10 text-rose-400' : 'bg-indigo-500/10 text-indigo-400'
-                          }`}>
+                          <div
+                            className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0"
+                            style={{
+                              background: isLowStock ? 'var(--danger-dim)' : 'var(--gold-muted)',
+                              color: isLowStock ? 'var(--danger)' : 'var(--gold)',
+                            }}
+                          >
                             {item.name.charAt(0).toUpperCase()}
                           </div>
-                          <span className="font-medium text-zinc-100">{item.name}</span>
+                          <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                            {item.name}
+                          </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-zinc-400">
-                         <span className="bg-[#1a1a1a] px-2 py-1 rounded-md text-xs">{item.category}</span>
+                      <td className="px-6 py-4">
+                        <span
+                          className="text-xs px-2.5 py-1 rounded-md font-medium"
+                          style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                        >
+                          {item.category}
+                        </span>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-baseline gap-1">
-                          <span className={`text-lg font-bold ${isLowStock ? 'text-rose-400' : 'text-zinc-100'}`}>
+                          <span
+                            className="text-lg font-bold stat-number"
+                            style={{ color: isLowStock ? 'var(--danger)' : 'var(--text-primary)' }}
+                          >
                             {item.stock}
                           </span>
-                          <span className="text-zinc-500">{item.unit}</span>
+                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{item.unit}</span>
+                        </div>
+                        {/* Mini progress bar */}
+                        <div
+                          className="mt-1.5 h-1 rounded-full overflow-hidden w-24"
+                          style={{ background: 'var(--bg-elevated)' }}
+                        >
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{
+                              width: `${Math.min(100, (Number(item.stock) / Math.max(Number(item.low_stock_threshold) * 3, 1)) * 100)}%`,
+                              background: isLowStock ? 'var(--danger)' : 'var(--success)',
+                            }}
+                          />
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-zinc-400">
+                      <td className="px-6 py-4" style={{ color: 'var(--text-secondary)' }}>
                         {item.average_price > 0 ? (
-                           <span>Rp {Number(item.average_price).toLocaleString('id-ID')} / {item.unit}</span>
+                          <span className="stat-number text-sm">
+                            Rp {Number(item.average_price).toLocaleString('id-ID')}
+                            <span className="text-xs ml-1" style={{ color: 'var(--text-muted)' }}>/ {item.unit}</span>
+                          </span>
                         ) : (
-                           <span className="text-zinc-600 italic">No purchases yet</span>
+                          <span className="text-xs italic" style={{ color: 'var(--text-muted)' }}>Belum ada pembelian</span>
                         )}
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center justify-between gap-3">
-                          {isLowStock ? (
-                            <div className="flex items-center gap-1.5 text-rose-400 bg-rose-500/10 px-2.5 py-1 rounded-full text-xs font-medium w-fit border border-rose-500/20">
-                              <AlertCircle className="w-3.5 h-3.5" />
-                              Low Stock
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1.5 text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full text-xs font-medium w-fit border border-emerald-500/20">
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              Good
-                            </div>
-                          )}
-
-                          <Link
-                            href={`/ingredients/${item.id}`}
-                            className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-white"
-                            title="Edit ingredient"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                            Edit
-                          </Link>
-                        </div>
+                        {isLowStock ? (
+                          <span className="badge badge-danger">
+                            <AlertTriangle className="w-3 h-3" />
+                            Stok Menipis
+                          </span>
+                        ) : (
+                          <span className="badge badge-success">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Aman
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <Link
+                          href={`/ingredients/${item.id}`}
+                          className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg item-interactive"
+                        >
+                          <Pencil className="w-3 h-3" />
+                          Edit
+                        </Link>
                       </td>
                     </tr>
                   );
