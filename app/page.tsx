@@ -35,6 +35,8 @@ type PurchasePoint = {
   date: string | number | Date;
   price: number | string;
   quantity: number | string;
+  purchase_unit: string | null;
+  unit_conversion: number | string | null;
 };
 
 export default async function Dashboard() {
@@ -101,7 +103,7 @@ export default async function Dashboard() {
   const { data: initialPurchases } = initialIngredientId
     ? await supabase
         .from('purchases')
-        .select('date, price, quantity')
+        .select('date, price, quantity, purchase_unit, unit_conversion')
         .eq('ingredient_id', initialIngredientId)
         .order('date', { ascending: true })
         .limit(30)
@@ -240,10 +242,10 @@ export default async function Dashboard() {
         >
           <div>
             <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-              Fluktuasi Harga Bahan
+              Tren Harga Beli Bahan
             </h2>
             <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-              Harga per satuan berdasarkan riwayat pembelian
+              Harga per satuan tiap transaksi pembelian — bukan rata-rata keseluruhan
             </p>
           </div>
           <span

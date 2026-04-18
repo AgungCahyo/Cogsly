@@ -11,6 +11,7 @@ type IngredientRow = {
   name: string;
   unit: string | null;
   average_price: number | string | null;
+  stock: number | string | null;
 };
 
 type RecipeItemRow = {
@@ -44,25 +45,13 @@ export default async function EditRecipePage({
 
   const { data: ingredients } = await supabase
     .from('ingredients')
-    .select('id, name, unit, average_price')
+    .select('id, name, unit, average_price, stock')
     .returns<IngredientRow[]>()
     .order('name');
 
   const { data: product, error } = await supabase
     .from('products')
-    .select(
-      `
-      id,
-      name,
-      price,
-      operational_cost_buffer,
-      is_percentage_buffer,
-      recipe_items (
-        ingredient_id,
-        amount_required
-      )
-    `
-    )
+    .select(`id, name, price, operational_cost_buffer, is_percentage_buffer, recipe_items(ingredient_id, amount_required)`)
     .eq('id', id)
     .single()
     .returns<ProductRow>();
@@ -84,10 +73,9 @@ export default async function EditRecipePage({
     'use server';
 
     const name = (data.name ?? '').trim();
-    if (!name) throw new Error('Recipe name is required.');
-    if (!Number.isFinite(data.price) || data.price < 0) throw new Error('Price must be a valid non-negative number.');
+    if (!name) throw new Error('Nama produk wajib diisi.');
+    if (!Number.isFinite(data.price) || data.price < 0) throw new Error('Harga harus angka non-negatif yang valid.');
 
-    // 1) Update product
     const { error: productError } = await supabase
       .from('products')
       .update({
@@ -100,7 +88,6 @@ export default async function EditRecipePage({
 
     if (productError) throw new Error(productError.message);
 
-    // 2) Replace recipe items (simple + deterministic)
     const { error: deleteError } = await supabase.from('recipe_items').delete().eq('product_id', id);
     if (deleteError) throw new Error(deleteError.message);
 
@@ -117,17 +104,21 @@ export default async function EditRecipePage({
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8">
+    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-8">
       <div className="flex items-center gap-4">
-        <Link
-          href="/recipes"
-          className="w-10 h-10 rounded-xl bg-[#111] border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
+        <Link href="/recipes" className="btn-ghost" style={{ padding: '0.5rem', borderRadius: '10px' }}>
+          <ArrowLeft style={{ width: '18px', height: '18px' }} />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white mb-1">Edit Recipe</h1>
-          <p className="text-zinc-500 text-sm">Update product pricing, operational buffer, and ingredient composition.</p>
+          <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--gold)', fontFamily: 'var(--font-mono)' }}>
+            ◆ Resep & HPP
+          </p>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-serif)' }}>
+            Edit Resep
+          </h1>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+            Update komposisi bahan dan perhitungan HPP
+          </p>
         </div>
       </div>
 
@@ -139,4 +130,3 @@ export default async function EditRecipePage({
     </div>
   );
 }
-

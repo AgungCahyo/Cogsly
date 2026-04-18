@@ -1,31 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Save, Plus, Trash2, Calculator, TrendingUp, Package } from 'lucide-react';
+import { Save, Plus, Trash2, Calculator, TrendingUp, Package, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-type IngredientOption = {
-  id: string;
-  name: string;
-  unit: string | null;
-  average_price: number | string | null;
-};
-
-type SubmitRecipeInput = {
-  name: string;
-  price: number;
-  operational_cost_buffer: number;
-  is_percentage_buffer: boolean;
-  items: { ingredient_id: string; amount_required: number }[];
-};
-
-type InitialRecipe = {
-  name: string;
-  price: number;
-  operational_cost_buffer: number;
-  is_percentage_buffer: boolean;
-  items: { ingredient_id: string; amount_required: number }[];
-};
+import { IngredientOption, RecipeInput } from '@/types';
 
 export function RecipeBuilderForm({
   ingredients,
@@ -33,8 +12,8 @@ export function RecipeBuilderForm({
   initialRecipe,
 }: {
   ingredients: IngredientOption[];
-  submitRecipe: (data: SubmitRecipeInput) => Promise<void>;
-  initialRecipe?: InitialRecipe;
+  submitRecipe: (data: RecipeInput) => Promise<void>;
+  initialRecipe?: RecipeInput;
 }) {
   const router = useRouter();
   const [name, setName] = useState(initialRecipe?.name ?? '');
@@ -69,6 +48,19 @@ export function RecipeBuilderForm({
   const margin = Number(price) - totalHPP;
   const marginPercent = Number(price) > 0 ? (margin / Number(price)) * 100 : 0;
 
+  // Check if any ingredient has insufficient stock
+  const stockWarnings = items
+    .filter(item => item.ingredient_id && item.amount)
+    .map(item => {
+      const ing = ingredients.find(i => i.id === item.ingredient_id);
+      if (!ing) return null;
+      const stock = Number(ing.stock) || 0;
+      const needed = Number(item.amount) || 0;
+      if (needed > stock) return { name: ing.name, stock, needed, unit: ing.unit };
+      return null;
+    })
+    .filter(Boolean) as { name: string; stock: number; needed: number; unit: string | null }[];
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -98,13 +90,13 @@ export function RecipeBuilderForm({
       {/* Left: builder */}
       <div className="lg:col-span-2 space-y-5">
         {/* Product info */}
-        <div className="rounded-2xl p-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-          <h2 className="font-bold mb-5 text-sm uppercase tracking-wider" style={{ color: 'var(--gold)', fontFamily: 'DM Mono, monospace' }}>
+        <div className="rounded-2xl p-6 bg-bg-card border border-border">
+          <h2 className="font-bold mb-5 text-sm uppercase tracking-wider text-gold font-mono">
             Detail Produk
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Nama Produk</label>
+              <label className="block text-sm font-medium mb-1.5 text-text-secondary">Nama Produk</label>
               <input
                 type="text"
                 required
@@ -115,7 +107,7 @@ export function RecipeBuilderForm({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Harga Jual (Rp)</label>
+              <label className="block text-sm font-medium mb-1.5 text-text-secondary">Harga Jual (Rp)</label>
               <input
                 type="number"
                 required
@@ -130,77 +122,117 @@ export function RecipeBuilderForm({
         </div>
 
         {/* Recipe composition */}
-        <div className="rounded-2xl p-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+        <div className="rounded-2xl p-6 bg-bg-card border border-border">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="font-bold text-sm uppercase tracking-wider" style={{ color: 'var(--gold)', fontFamily: 'DM Mono, monospace' }}>
+            <h2 className="font-bold text-sm uppercase tracking-wider text-gold font-mono">
               Komposisi Resep
             </h2>
-            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{items.filter(i => i.ingredient_id).length} bahan dipilih</span>
+            <span className="text-xs text-text-muted">{items.filter(i => i.ingredient_id).length} bahan dipilih</span>
           </div>
 
           <div className="space-y-2.5">
             {items.map((item, itemIdx) => {
               const selectedIng = ingredients.find(i => i.id === item.ingredient_id);
+              const stock = Number(selectedIng?.stock) || 0;
+              const needed = Number(item.amount) || 0;
+              const isLowStock = selectedIng && needed > 0 && needed > stock;
+              const hasStock = selectedIng && stock > 0;
+
               return (
                 <div
                   key={item.id}
-                  className="flex items-center gap-3 p-3 rounded-xl"
-                  style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}
+                  className={`rounded-xl overflow-hidden border ${
+                    isLowStock ? 'border-danger/30 bg-danger/5' : 'border-border bg-bg-elevated'
+                  }`}
                 >
-                  <div
-                    className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold"
-                    style={{ background: 'var(--gold-muted)', color: 'var(--gold)' }}
-                  >
-                    {itemIdx + 1}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <select
-                      value={item.ingredient_id}
-                      onChange={e => updateItem(item.id, 'ingredient_id', e.target.value)}
-                      required
-                      className="w-full text-sm font-medium bg-transparent border-none outline-none"
-                      style={{ color: 'var(--text-primary)' }}
+                  <div className="flex items-center gap-3 p-3">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold bg-gold-muted text-gold">
+                      {itemIdx + 1}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <select
+                        value={item.ingredient_id}
+                        onChange={e => updateItem(item.id, 'ingredient_id', e.target.value)}
+                        required
+                        className="w-full text-sm font-medium bg-transparent border-none outline-none text-text-primary"
+                      >
+                        <option value="" disabled>Pilih bahan...</option>
+                        {ingredients.map(ing => (
+                          <option key={ing.id} value={ing.id}>
+                            {ing.name} ({ing.unit})
+                          </option>
+                        ))}
+                      </select>
+
+                      {/* Stock info row */}
+                      {selectedIng && (
+                        <div className="flex items-center gap-3 mt-1">
+                          {Number(selectedIng.average_price) > 0 && (
+                            <span className="text-xs text-text-muted">
+                              Rp {Number(selectedIng.average_price).toLocaleString('id-ID')} / {selectedIng.unit}
+                            </span>
+                          )}
+                          <span
+                            className={`text-xs flex items-center gap-1 ${
+                              isLowStock ? 'text-danger' : hasStock ? 'text-success' : 'text-text-muted'
+                            }`}
+                          >
+                            {isLowStock
+                              ? <AlertTriangle className="w-3 h-3" />
+                              : hasStock
+                              ? <CheckCircle2 className="w-3 h-3" />
+                              : null
+                            }
+                            Stok: {stock.toLocaleString('id-ID')} {selectedIng.unit}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Amount input */}
+                    <div
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg shrink-0 bg-bg-card border ${
+                        isLowStock ? 'border-danger/40' : 'border-border'
+                      }`}
                     >
-                      <option value="" disabled>Pilih bahan...</option>
-                      {ingredients.map(ing => (
-                        <option key={ing.id} value={ing.id}>{ing.name} ({ing.unit})</option>
-                      ))}
-                    </select>
-                    {selectedIng && Number(selectedIng.average_price) > 0 && (
-                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                        Rp {Number(selectedIng.average_price).toLocaleString('id-ID')} / {selectedIng.unit}
-                      </p>
-                    )}
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        required
+                        value={item.amount}
+                        onChange={e => updateItem(item.id, 'amount', e.target.value === '' ? '' : Number(e.target.value))}
+                        placeholder="0"
+                        className={`w-16 text-right text-sm bg-transparent border-none outline-none ${
+                          isLowStock ? 'text-danger' : 'text-text-primary'
+                        }`}
+                      />
+                      {selectedIng && (
+                        <span className="text-xs font-medium text-text-muted min-w-[24px]">
+                          {selectedIng.unit}
+                        </span>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => removeItem(item.id)}
+                      className="p-1.5 rounded-lg transition-colors shrink-0 text-text-muted hover:text-danger"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
-                  <div
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
-                    style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
-                  >
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      required
-                      value={item.amount}
-                      onChange={e => updateItem(item.id, 'amount', e.target.value === '' ? '' : Number(e.target.value))}
-                      placeholder="0"
-                      className="w-16 text-right text-sm bg-transparent border-none outline-none"
-                      style={{ color: 'var(--text-primary)' }}
-                    />
-                    {selectedIng && (
-                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{selectedIng.unit}</span>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removeItem(item.id)}
-                    className="p-1.5 rounded-lg transition-colors shrink-0"
-                    style={{ color: 'var(--text-muted)' }}
-                    onMouseEnter={e => (e.currentTarget.style.color = 'var(--danger)')}
-                    onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+
+                  {/* Low stock warning bar */}
+                  {isLowStock && (
+                    <div className="px-3 py-2 flex items-center gap-2 text-xs bg-danger-dim border-t border-danger/20">
+                      <AlertTriangle className="w-3 h-3 shrink-0 text-danger" />
+                      <span className="text-danger">
+                        Stok tidak cukup — dibutuhkan {needed.toLocaleString('id-ID')} {selectedIng?.unit}, tersedia {stock.toLocaleString('id-ID')} {selectedIng?.unit}
+                      </span>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -209,8 +241,7 @@ export function RecipeBuilderForm({
           <button
             type="button"
             onClick={addItem}
-            className="mt-4 inline-flex items-center gap-2 text-sm font-medium transition-colors"
-            style={{ color: 'var(--gold)' }}
+            className="mt-4 inline-flex items-center gap-2 text-sm font-medium transition-colors text-gold"
           >
             <Plus className="w-4 h-4" />
             Tambah Bahan
@@ -218,11 +249,11 @@ export function RecipeBuilderForm({
         </div>
 
         {/* Operational cost */}
-        <div className="rounded-2xl p-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-          <h2 className="font-bold text-sm uppercase tracking-wider mb-1" style={{ color: 'var(--gold)', fontFamily: 'DM Mono, monospace' }}>
+        <div className="rounded-2xl p-6 bg-bg-card border border-border">
+          <h2 className="font-bold text-sm uppercase tracking-wider mb-1 text-gold font-mono">
             Biaya Operasional
           </h2>
-          <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-xs mb-4 text-text-muted">
             Buffer untuk kemasan, listrik, tenaga kerja, dll.
           </p>
           <div className="flex items-center gap-3">
@@ -237,27 +268,20 @@ export function RecipeBuilderForm({
                 style={{ paddingRight: '6rem' }}
               />
               <div className="absolute inset-y-0 right-1 flex items-center">
-                <div
-                  className="flex items-center p-1 rounded-lg"
-                  style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}
-                >
+                <div className="flex items-center p-1 rounded-lg bg-bg-elevated border border-border">
                   <button
                     type="button"
                     onClick={() => setIsPercent(true)}
-                    className="px-2 py-1 text-xs font-bold rounded-md transition-colors"
-                    style={{
-                      background: isPercent ? 'var(--gold)' : 'transparent',
-                      color: isPercent ? '#0a0905' : 'var(--text-muted)',
-                    }}
+                    className={`px-2 py-1 text-xs font-bold rounded-md transition-colors ${
+                      isPercent ? 'bg-gold text-[#0a0905]' : 'bg-transparent text-text-muted'
+                    }`}
                   >%</button>
                   <button
                     type="button"
                     onClick={() => setIsPercent(false)}
-                    className="px-2 py-1 text-xs font-bold rounded-md transition-colors"
-                    style={{
-                      background: !isPercent ? 'var(--gold)' : 'transparent',
-                      color: !isPercent ? '#0a0905' : 'var(--text-muted)',
-                    }}
+                    className={`px-2 py-1 text-xs font-bold rounded-md transition-colors ${
+                      !isPercent ? 'bg-gold text-[#0a0905]' : 'bg-transparent text-text-muted'
+                    }`}
                   >Rp</button>
                 </div>
               </div>
@@ -268,13 +292,10 @@ export function RecipeBuilderForm({
 
       {/* Right: live calculator */}
       <div className="space-y-5">
-        <div
-          className="rounded-2xl p-6 sticky top-8"
-          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
-        >
+        <div className="rounded-2xl p-6 sticky top-8 bg-bg-card border border-border">
           <div className="flex items-center gap-2 mb-6">
-            <Calculator className="w-4 h-4" style={{ color: 'var(--gold)' }} />
-            <h3 className="font-bold text-sm" style={{ color: 'var(--gold)', fontFamily: 'DM Mono, monospace' }}>
+            <Calculator className="w-4 h-4 text-gold" />
+            <h3 className="font-bold text-sm text-gold font-mono">
               ESTIMASI HPP LANGSUNG
             </h3>
           </div>
@@ -284,20 +305,20 @@ export function RecipeBuilderForm({
               { label: 'Bahan Baku', value: rawMaterialHPP, icon: Package },
               { label: 'Biaya Operasional', value: opCost, icon: TrendingUp, prefix: '+ ' },
             ].map(({ label, value, icon: Icon, prefix }) => (
-              <div key={label} className="flex items-center justify-between py-2" style={{ borderBottom: '1px solid var(--border)' }}>
-                <span className="text-xs flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+              <div key={label} className="flex items-center justify-between py-2 border-b border-border">
+                <span className="text-xs flex items-center gap-1.5 text-text-secondary">
                   <Icon className="w-3 h-3" />
                   {label}
                 </span>
-                <span className="text-sm font-medium stat-number" style={{ color: 'var(--text-secondary)' }}>
+                <span className="text-sm font-medium stat-number text-text-secondary">
                   {prefix}Rp {Math.round(value).toLocaleString('id-ID')}
                 </span>
               </div>
             ))}
 
             <div className="flex items-center justify-between pt-2">
-              <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Total HPP</span>
-              <span className="text-xl font-bold stat-number" style={{ color: 'var(--text-primary)' }}>
+              <span className="text-sm font-bold text-text-primary">Total HPP</span>
+              <span className="text-xl font-bold stat-number text-text-primary">
                 Rp {Math.round(totalHPP).toLocaleString('id-ID')}
               </span>
             </div>
@@ -305,40 +326,43 @@ export function RecipeBuilderForm({
 
           {/* Margin */}
           <div
-            className="mt-5 p-4 rounded-xl"
-            style={{
-              background: margin >= 0 ? 'var(--success-dim)' : 'var(--danger-dim)',
-              border: `1px solid ${margin >= 0 ? 'rgba(74,158,107,0.2)' : 'rgba(196,92,58,0.2)'}`,
-            }}
+            className={`mt-5 p-4 rounded-xl border ${
+              margin >= 0 ? 'bg-success-dim border-success/20' : 'bg-danger-dim border-danger/20'
+            }`}
           >
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-medium" style={{ color: margin >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+              <span className={`text-xs font-medium ${margin >= 0 ? 'text-success' : 'text-danger'}`}>
                 Proyeksi Margin
               </span>
-              <span
-                className="text-sm font-bold"
-                style={{ color: margin >= 0 ? 'var(--success)' : 'var(--danger)' }}
-              >
+              <span className={`text-sm font-bold ${margin >= 0 ? 'text-success' : 'text-danger'}`}>
                 {marginPercent.toFixed(1)}%
               </span>
             </div>
-            <p
-              className="text-2xl font-bold stat-number"
-              style={{ color: margin >= 0 ? 'var(--success)' : 'var(--danger)' }}
-            >
+            <p className={`text-2xl font-bold stat-number ${margin >= 0 ? 'text-success' : 'text-danger'}`}>
               Rp {Math.round(margin).toLocaleString('id-ID')}
             </p>
-            {/* Margin bar */}
-            <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(0,0,0,0.2)' }}>
+            <div className="mt-2 h-1.5 rounded-full overflow-hidden bg-black/20">
               <div
-                className="h-full rounded-full"
-                style={{
-                  width: `${Math.min(100, Math.max(0, marginPercent))}%`,
-                  background: margin >= 0 ? 'var(--success)' : 'var(--danger)',
-                }}
+                className={`h-full rounded-full ${margin >= 0 ? 'bg-success' : 'bg-danger'}`}
+                style={{ width: `${Math.min(100, Math.max(0, marginPercent))}%` }}
               />
             </div>
           </div>
+
+          {/* Stock warnings summary */}
+          {stockWarnings.length > 0 && (
+            <div className="mt-4 p-3 rounded-xl space-y-1.5 bg-danger-dim border border-danger/20">
+              <p className="text-xs font-semibold flex items-center gap-1.5 text-danger">
+                <AlertTriangle className="w-3 h-3" />
+                Stok tidak mencukupi
+              </p>
+              {stockWarnings.map(w => (
+                <p key={w.name} className="text-xs text-danger opacity-80">
+                  {w.name}: butuh {w.needed.toLocaleString('id-ID')}, ada {w.stock.toLocaleString('id-ID')} {w.unit}
+                </p>
+              ))}
+            </div>
+          )}
 
           <button
             type="submit"

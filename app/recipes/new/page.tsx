@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { RecipeBuilderForm } from './RecipeBuilderForm';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,6 +11,7 @@ type IngredientRow = {
   name: string;
   unit: string | null;
   average_price: number | string | null;
+  stock: number | string | null;
 };
 
 type SubmitRecipeInput = {
@@ -23,7 +25,7 @@ type SubmitRecipeInput = {
 export default async function NewRecipePage() {
   const { data: ingredients } = await supabase
     .from('ingredients')
-    .select('id, name, unit, average_price')
+    .select('id, name, unit, average_price, stock')
     .returns<IngredientRow[]>()
     .order('name');
 
@@ -31,7 +33,12 @@ export default async function NewRecipePage() {
     'use server';
     const { data: productData, error: productError } = await supabase
       .from('products')
-      .insert([{ name: data.name, price: data.price, operational_cost_buffer: data.operational_cost_buffer, is_percentage_buffer: data.is_percentage_buffer }])
+      .insert([{
+        name: data.name,
+        price: data.price,
+        operational_cost_buffer: data.operational_cost_buffer,
+        is_percentage_buffer: data.is_percentage_buffer,
+      }])
       .select()
       .single();
 
@@ -40,11 +47,13 @@ export default async function NewRecipePage() {
     const recipeItems = data.items.map((item) => ({
       product_id: productData.id,
       ingredient_id: item.ingredient_id,
-      amount_required: item.amount_required
+      amount_required: item.amount_required,
     }));
 
     const { error: itemsError } = await supabase.from('recipe_items').insert(recipeItems);
     if (itemsError) throw new Error('Gagal menambahkan bahan resep');
+
+    redirect('/recipes');
   }
 
   return (
@@ -54,10 +63,10 @@ export default async function NewRecipePage() {
           <ArrowLeft style={{ width: '18px', height: '18px' }} />
         </Link>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--gold)', fontFamily: 'DM Mono, monospace' }}>
+          <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--gold)', fontFamily: 'var(--font-mono)' }}>
             ◆ Resep & HPP
           </p>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)', fontFamily: 'DM Serif Display, serif' }}>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-serif)' }}>
             Buat Resep Baru
           </h1>
           <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>

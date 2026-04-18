@@ -47,32 +47,25 @@ function IngredientForm({
       <div className="flex items-center gap-4">
         <Link
           href="/ingredients"
-          className="w-10 h-10 rounded-xl flex items-center justify-center transition-all btn-ghost"
-          style={{ padding: 0 }}
+          className="w-10 h-10 rounded-xl flex items-center justify-center transition-all btn-ghost p-0"
         >
-          <ArrowLeft className="w-4.5 h-4.5" style={{ width: '18px', height: '18px' }} />
+          <ArrowLeft className="w-[18px] h-[18px]" />
         </Link>
         <div>
-          <p
-            className="text-xs font-semibold uppercase tracking-widest mb-1"
-            style={{ color: 'var(--gold)', fontFamily: 'DM Mono, monospace' }}
-          >
+          <p className="text-xs font-semibold uppercase tracking-widest mb-1 text-gold font-mono">
             ◆ Inventori
           </p>
-          <h1
-            className="text-2xl font-bold"
-            style={{ color: 'var(--text-primary)', fontFamily: 'DM Serif Display, serif' }}
-          >
+          <h1 className="text-2xl font-bold text-text-primary font-serif">
             {mode === 'create' ? 'Tambah Bahan Baku' : 'Edit Bahan Baku'}
           </h1>
         </div>
       </div>
 
-      <div className="rounded-2xl p-6 md:p-8 space-y-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+      <div className="rounded-2xl p-6 md:p-8 space-y-6 bg-bg-card border border-border">
         <form action={action} className="space-y-5">
           {/* Name */}
           <div>
-            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+            <label className="block text-sm font-medium mb-1.5 text-text-secondary">
               Nama Bahan
             </label>
             <input
@@ -88,10 +81,10 @@ function IngredientForm({
           {/* Category + Unit */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+              <label className="block text-sm font-medium mb-1.5 text-text-secondary">
                 Kategori
               </label>
-              <select name="category" required defaultValue={defaultValues?.category} className="input-base" style={{ appearance: 'none' }}>
+              <select name="category" required defaultValue={defaultValues?.category} className="input-base !appearance-none">
                 <option value="Beans">Biji Kopi</option>
                 <option value="Dairy">Susu & Dairy</option>
                 <option value="Syrup">Sirup</option>
@@ -100,10 +93,10 @@ function IngredientForm({
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+              <label className="block text-sm font-medium mb-1.5 text-text-secondary">
                 Satuan (UoM)
               </label>
-              <select name="unit" required defaultValue={defaultValues?.unit} className="input-base" style={{ appearance: 'none' }}>
+              <select name="unit" required defaultValue={defaultValues?.unit} className="input-base !appearance-none">
                 <option value="gr">Gram (gr)</option>
                 <option value="kg">Kilogram (kg)</option>
                 <option value="ml">Mililiter (ml)</option>
@@ -114,7 +107,7 @@ function IngredientForm({
 
           {/* Threshold */}
           <div>
-            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+            <label className="block text-sm font-medium mb-1.5 text-text-secondary">
               Ambang Batas Stok Minimum
             </label>
             <div className="relative">
@@ -125,20 +118,19 @@ function IngredientForm({
                 min="0"
                 step="0.01"
                 defaultValue={defaultValues?.low_stock_threshold ?? '0'}
-                className="input-base"
-                style={{ paddingRight: '4rem' }}
+                className="input-base pr-16"
               />
               <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
-                <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>satuan</span>
+                <span className="text-xs font-medium text-text-muted">satuan</span>
               </div>
             </div>
-            <p className="mt-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+            <p className="mt-1.5 text-xs text-text-muted">
               Peringatan akan muncul jika stok di bawah angka ini.
             </p>
           </div>
 
           {/* Footer */}
-          <div className="pt-4 flex justify-between items-center" style={{ borderTop: '1px solid var(--border)' }}>
+          <div className="pt-4 flex justify-between items-center border-t border-border">
             <Link href="/ingredients" className="btn-ghost text-sm">
               Batal
             </Link>

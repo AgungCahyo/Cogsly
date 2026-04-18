@@ -7,6 +7,8 @@ type PurchaseRow = {
   date: string;
   price: number | string;
   quantity: number | string;
+  purchase_unit: string | null;
+  unit_conversion: number | string | null;
 };
 
 export async function GET(request: Request) {
@@ -19,7 +21,7 @@ export async function GET(request: Request) {
 
   const { data, error } = await supabase
     .from('purchases')
-    .select('date, price, quantity')
+    .select('date, price, quantity, purchase_unit, unit_conversion')
     .eq('ingredient_id', ingredientId)
     .order('date', { ascending: true })
     .limit(30)
@@ -31,4 +33,3 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ data: data ?? [] });
 }
-

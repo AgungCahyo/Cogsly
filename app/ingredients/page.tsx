@@ -2,12 +2,15 @@ import { supabase } from '@/lib/supabase';
 import { PackagePlus, AlertTriangle, CheckCircle2, Pencil, Package } from 'lucide-react';
 import Link from 'next/link';
 
+import { Ingredient } from '@/types';
+
 export const dynamic = 'force-dynamic';
 
 export default async function IngredientsPage() {
   const { data: ingredients, error } = await supabase
     .from('ingredients')
     .select('*')
+    .returns<Ingredient[]>()
     .order('name');
 
   const totalItems = ingredients?.length ?? 0;
@@ -136,23 +139,18 @@ export default async function IngredientsPage() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div
-                            className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0"
-                            style={{
-                              background: isLowStock ? 'var(--danger-dim)' : 'var(--gold-muted)',
-                              color: isLowStock ? 'var(--danger)' : 'var(--gold)',
-                            }}
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${isLowStock ? 'bg-[var(--danger-dim)] text-[var(--danger)]' : 'bg-[var(--gold-muted)] text-[var(--gold)]'}`}
                           >
                             {item.name.charAt(0).toUpperCase()}
                           </div>
-                          <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                          <span className="font-medium text-[var(--text-primary)]">
                             {item.name}
                           </span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <span
-                          className="text-xs px-2.5 py-1 rounded-md font-medium"
-                          style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                          className="text-xs px-2.5 py-1 rounded-md font-medium bg-[var(--bg-elevated)] text-[var(--text-secondary)] border border-[var(--border)]"
                         >
                           {item.category}
                         </span>
@@ -160,35 +158,33 @@ export default async function IngredientsPage() {
                       <td className="px-6 py-4">
                         <div className="flex items-baseline gap-1">
                           <span
-                            className="text-lg font-bold stat-number"
-                            style={{ color: isLowStock ? 'var(--danger)' : 'var(--text-primary)' }}
+                            className={`text-lg font-bold stat-number ${isLowStock ? 'text-[var(--danger)]' : 'text-[var(--text-primary)]'}`}
                           >
                             {item.stock}
                           </span>
-                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{item.unit}</span>
+                          <span className="text-xs text-[var(--text-muted)]">{item.unit}</span>
                         </div>
                         {/* Mini progress bar */}
                         <div
-                          className="mt-1.5 h-1 rounded-full overflow-hidden w-24"
-                          style={{ background: 'var(--bg-elevated)' }}
+                          className="mt-1.5 h-1 rounded-full overflow-hidden w-24 bg-[var(--bg-elevated)]"
                         >
                           <div
                             className="h-full rounded-full transition-all"
                             style={{
                               width: `${Math.min(100, (Number(item.stock) / Math.max(Number(item.low_stock_threshold) * 3, 1)) * 100)}%`,
-                              background: isLowStock ? 'var(--danger)' : 'var(--success)',
+                              backgroundColor: isLowStock ? 'var(--danger)' : 'var(--success)',
                             }}
                           />
                         </div>
                       </td>
-                      <td className="px-6 py-4" style={{ color: 'var(--text-secondary)' }}>
-                        {item.average_price > 0 ? (
+                      <td className="px-6 py-4 text-[var(--text-secondary)]">
+                        {Number(item.average_price) > 0 ? (
                           <span className="stat-number text-sm">
                             Rp {Number(item.average_price).toLocaleString('id-ID')}
-                            <span className="text-xs ml-1" style={{ color: 'var(--text-muted)' }}>/ {item.unit}</span>
+                            <span className="text-xs ml-1 text-[var(--text-muted)]">/ {item.unit}</span>
                           </span>
                         ) : (
-                          <span className="text-xs italic" style={{ color: 'var(--text-muted)' }}>Belum ada pembelian</span>
+                          <span className="text-xs italic text-[var(--text-muted)]">Belum ada pembelian</span>
                         )}
                       </td>
                       <td className="px-6 py-4">

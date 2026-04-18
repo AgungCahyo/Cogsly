@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { ShoppingCart, Plus, FileText, ExternalLink, Calendar } from 'lucide-react';
+import { ShoppingCart, Plus, FileText, Calendar, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
@@ -13,13 +13,15 @@ type PurchaseLogRow = {
   price: number | string;
   quantity: number | string;
   evidence_url: string | null;
+  purchase_unit: string | null;
+  unit_conversion: number | string | null;
   ingredients: { name: string; unit: string | null } | null;
 };
 
 export default async function ProcurementPage() {
   const { data: purchases, error } = await supabase
     .from('purchases')
-    .select(`id, date, supplier, price, quantity, evidence_url, ingredients(name, unit)`)
+    .select(`id, date, supplier, price, quantity, evidence_url, purchase_unit, unit_conversion, ingredients(name, unit)`)
     .returns<PurchaseLogRow[]>()
     .order('date', { ascending: false });
 
@@ -31,10 +33,10 @@ export default async function ProcurementPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--gold)', fontFamily: 'DM Mono, monospace' }}>
+          <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--gold)', fontFamily: 'var(--font-mono)' }}>
             ◆ Pengadaan
           </p>
-          <h1 className="text-3xl font-bold" style={{ color: 'var(--text-primary)', fontFamily: 'DM Serif Display, serif' }}>
+          <h1 className="text-3xl font-bold" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-serif)' }}>
             Log Pembelian
           </h1>
           <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
@@ -76,7 +78,7 @@ export default async function ProcurementPage() {
             <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}>
               <ShoppingCart className="w-7 h-7" style={{ color: 'var(--text-muted)' }} />
             </div>
-            <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)', fontFamily: 'DM Serif Display, serif' }}>
+            <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-serif)' }}>
               Belum ada pembelian
             </h3>
             <p className="text-sm mb-6 max-w-sm" style={{ color: 'var(--text-secondary)' }}>
@@ -91,7 +93,7 @@ export default async function ProcurementPage() {
             <table className="w-full whitespace-nowrap text-left text-sm">
               <thead>
                 <tr style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border)' }}>
-                  {['Tanggal', 'Bahan', 'Pemasok', 'Jumlah', 'Total Harga', 'Bukti'].map(h => (
+                  {['Tanggal', 'Bahan', 'Pemasok', 'Jumlah Beli', 'Masuk ke Stok', 'Total Harga', 'Bukti'].map(h => (
                     <th key={h} className="px-6 py-3.5 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                       {h}
                     </th>
@@ -99,61 +101,97 @@ export default async function ProcurementPage() {
                 </tr>
               </thead>
               <tbody>
-                {purchases.map((log, idx) => (
-                  <tr
-                    key={log.id}
-                    className="table-row-hover transition-colors"
-                    style={{ borderBottom: idx < purchases.length - 1 ? '1px solid var(--border)' : 'none' }}
-                  >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
-                        <Calendar className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--text-muted)' }} />
-                        <span className="text-sm">{format(new Date(log.date), 'dd MMM yyyy', { locale: id })}</span>
-                      </div>
-                      <p className="text-xs mt-0.5 ml-5.5" style={{ color: 'var(--text-muted)' }}>
-                        {format(new Date(log.date), 'HH:mm')}
-                      </p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-                        {log.ingredients?.name}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className="text-xs px-2.5 py-1 rounded-md"
-                        style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
-                      >
-                        {log.supplier ?? '—'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-semibold stat-number" style={{ color: 'var(--text-primary)' }}>{log.quantity}</span>
-                      <span className="text-xs ml-1" style={{ color: 'var(--text-muted)' }}>{log.ingredients?.unit}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-semibold stat-number" style={{ color: 'var(--gold)' }}>
-                        Rp {Number(log.price).toLocaleString('id-ID')}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      {log.evidence_url ? (
-                        <a
-                          href={log.evidence_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg transition-all"
-                          style={{ background: 'var(--gold-muted)', color: 'var(--gold)', border: '1px solid rgba(212,170,60,0.2)' }}
-                          title="Lihat Bukti"
+                {purchases.map((log, idx) => {
+                  const hasConversion = log.purchase_unit && Number(log.unit_conversion) > 1;
+                  const stockAdded = Number(log.quantity) * (hasConversion ? Number(log.unit_conversion) : 1);
+
+                  return (
+                    <tr
+                      key={log.id}
+                      className="table-row-hover transition-colors"
+                      style={{ borderBottom: idx < purchases.length - 1 ? '1px solid var(--border)' : 'none' }}
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
+                          <Calendar className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--text-muted)' }} />
+                          <span className="text-sm">{format(new Date(log.date), 'dd MMM yyyy', { locale: id })}</span>
+                        </div>
+                        <p className="text-xs mt-0.5 ml-5.5" style={{ color: 'var(--text-muted)' }}>
+                          {format(new Date(log.date), 'HH:mm')}
+                        </p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                          {log.ingredients?.name}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className="text-xs px-2.5 py-1 rounded-md"
+                          style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
                         >
-                          <FileText className="w-3.5 h-3.5" />
-                        </a>
-                      ) : (
-                        <span className="text-xs italic" style={{ color: 'var(--text-muted)' }}>—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                          {log.supplier ?? '—'}
+                        </span>
+                      </td>
+
+                      {/* Jumlah Beli — dalam satuan beli asli */}
+                      <td className="px-6 py-4">
+                        <span className="font-semibold stat-number" style={{ color: 'var(--text-primary)' }}>
+                          {log.quantity}
+                        </span>
+                        <span className="text-xs ml-1" style={{ color: 'var(--text-muted)' }}>
+                          {log.purchase_unit || log.ingredients?.unit}
+                        </span>
+                        {hasConversion && (
+                          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                            1 {log.purchase_unit} = {Number(log.unit_conversion).toLocaleString('id-ID')} {log.ingredients?.unit}
+                          </p>
+                        )}
+                      </td>
+
+                      {/* Masuk ke Stok — dalam satuan dasar */}
+                      <td className="px-6 py-4">
+                        {hasConversion ? (
+                          <div className="flex items-center gap-1.5">
+                            <ArrowRight className="w-3 h-3 shrink-0" style={{ color: 'var(--gold)' }} />
+                            <span className="font-semibold stat-number" style={{ color: 'var(--gold)' }}>
+                              {stockAdded.toLocaleString('id-ID')}
+                            </span>
+                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                              {log.ingredients?.unit}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xs italic" style={{ color: 'var(--text-muted)' }}>
+                            {stockAdded} {log.ingredients?.unit}
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="px-6 py-4">
+                        <span className="font-semibold stat-number" style={{ color: 'var(--gold)' }}>
+                          Rp {Number(log.price).toLocaleString('id-ID')}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {log.evidence_url ? (
+                          <a
+                            href={log.evidence_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg transition-all"
+                            style={{ background: 'var(--gold-muted)', color: 'var(--gold)', border: '1px solid rgba(212,170,60,0.2)' }}
+                            title="Lihat Bukti"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                          </a>
+                        ) : (
+                          <span className="text-xs italic" style={{ color: 'var(--text-muted)' }}>—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

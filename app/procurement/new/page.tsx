@@ -1,7 +1,10 @@
 import { supabase } from '@/lib/supabase';
-import { ArrowLeft, Save, UploadCloud } from 'lucide-react';
+import { ArrowLeft, PackagePlus, Save } from 'lucide-react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { ProcurementForm } from '@/components/ProcurementForm';
+
+import { IngredientOption } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,6 +12,7 @@ export default async function AddPurchasePage() {
   const { data: ingredients } = await supabase
     .from('ingredients')
     .select('id, name, unit')
+    .returns<IngredientOption[]>()
     .order('name');
 
   async function submitPurchase(formData: FormData) {
@@ -17,10 +21,13 @@ export default async function AddPurchasePage() {
     const supplier = formData.get('supplier') as string;
     const quantity = Number(formData.get('quantity'));
     const price = Number(formData.get('price'));
+    const purchase_unit = (formData.get('purchase_unit') as string)?.trim() || null;
+    const unit_conversion = Number(formData.get('unit_conversion') || '1');
     const receiptFile = formData.get('receipt') as File;
 
-    let evidence_url = null;
+    const quantityInBaseUnit = quantity * (unit_conversion > 0 ? unit_conversion : 1);
 
+    let evidence_url = null;
     if (receiptFile && receiptFile.size > 0 && receiptFile.name !== 'undefined') {
       const fileExt = receiptFile.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
@@ -36,7 +43,7 @@ export default async function AddPurchasePage() {
 
     const { error: purchaseError } = await supabase
       .from('purchases')
-      .insert([{ ingredient_id, supplier, quantity, price, evidence_url }]);
+      .insert([{ ingredient_id, supplier, quantity, price, evidence_url, purchase_unit, unit_conversion }]);
 
     if (purchaseError) return redirect('/procurement');
 
@@ -49,7 +56,7 @@ export default async function AddPurchasePage() {
     if (ingredientData) {
       const oldStock = Number(ingredientData.stock) || 0;
       const oldAvgPrice = Number(ingredientData.average_price) || 0;
-      const newStock = oldStock + quantity;
+      const newStock = oldStock + quantityInBaseUnit;
       const newAvgPrice = (oldStock * oldAvgPrice + price) / newStock;
       await supabase.from('ingredients').update({ stock: newStock, average_price: newAvgPrice }).eq('id', ingredient_id);
     }
@@ -60,110 +67,25 @@ export default async function AddPurchasePage() {
   return (
     <div className="p-6 lg:p-8 max-w-2xl mx-auto space-y-8">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link href="/procurement" className="btn-ghost" style={{ padding: '0.5rem', borderRadius: '10px' }}>
-          <ArrowLeft style={{ width: '18px', height: '18px' }} />
+      <div className="flex items-center gap-4 mb-2">
+        <Link href="/procurement" className="btn-ghost p-2 rounded-[10px] shrink-0">
+          <ArrowLeft className="w-5 h-5" />
         </Link>
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--gold)', fontFamily: 'var(--font-mono)' }}>
-            ◆ Pengadaan
-          </p>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-serif)' }}>
-            Catat Pembelian
-          </h1>
-          <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-            HPP rata-rata akan diperbarui otomatis
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-gold/10 border border-gold/20">
+            <PackagePlus className="w-5 h-5 text-gold" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold font-serif text-gold tracking-tight leading-none">Catat Pembelian</h1>
+            <p className="text-xs text-text-muted mt-1 uppercase tracking-wider font-mono">Update Stok & HPP</p>
+          </div>
         </div>
       </div>
 
-      <div className="rounded-2xl p-6 md:p-8" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-        <form action={submitPurchase} className="space-y-5">
-          {/* Ingredient */}
-          <div>
-            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-              Pilih Bahan Baku
-            </label>
-            <select name="ingredient_id" required className="input-base" style={{ appearance: 'none' }}>
-              <option value="" disabled>-- Pilih bahan --</option>
-              {ingredients?.map(ing => (
-                <option key={ing.id} value={ing.id}>{ing.name} ({ing.unit})</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Supplier */}
-          <div>
-            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-              Nama Pemasok / Toko
-            </label>
-            <input
-              type="text"
-              name="supplier"
-              required
-              placeholder="cth. Toko Makmur / Pasar Induk"
-              className="input-base"
-            />
-          </div>
-
-          {/* Qty + Price */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-                Jumlah Dibeli
-              </label>
-              <input
-                type="number"
-                name="quantity"
-                required
-                min="0"
-                step="0.01"
-                placeholder="0"
-                className="input-base"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-                Total Harga (Rp)
-              </label>
-              <input
-                type="number"
-                name="price"
-                required
-                min="0"
-                placeholder="cth. 150000"
-                className="input-base"
-              />
-            </div>
-          </div>
-
-          {/* Receipt upload */}
-          <div>
-            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-              Upload Bukti Nota <span className="font-normal" style={{ color: 'var(--text-muted)' }}>(opsional)</span>
-            </label>
-            <label
-              htmlFor="receipt"
-              className="flex flex-col items-center justify-center w-full h-28 rounded-xl cursor-pointer upload-interactive"
-            >
-              <UploadCloud className="w-6 h-6 mb-2" style={{ color: 'var(--text-muted)' }} />
-              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                <span style={{ color: 'var(--gold)' }} className="font-medium">Klik untuk upload</span> atau seret file
-              </p>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>JPEG, PNG, atau PDF</p>
-              <input id="receipt" name="receipt" type="file" className="hidden" accept="image/*,.pdf" />
-            </label>
-          </div>
-
-          {/* Footer */}
-          <div className="pt-4 flex justify-between items-center" style={{ borderTop: '1px solid var(--border)' }}>
-            <Link href="/procurement" className="btn-ghost text-sm">Batal</Link>
-            <button type="submit" className="btn-primary">
-              <Save className="w-4 h-4" />
-              Simpan & Update Stok
-            </button>
-          </div>
-        </form>
+      <div className="max-w-2xl">
+        <div className="rounded-2xl p-8 bg-bg-card border border-border">
+          <ProcurementForm ingredients={ingredients || []} onSubmit={submitPurchase} />
+        </div>
       </div>
     </div>
   );
