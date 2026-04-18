@@ -6,17 +6,7 @@ import { id } from 'date-fns/locale';
 
 export const dynamic = 'force-dynamic';
 
-type PurchaseLogRow = {
-  id: string;
-  date: string | number | Date;
-  supplier: string | null;
-  price: number | string;
-  quantity: number | string;
-  evidence_url: string | null;
-  purchase_unit: string | null;
-  unit_conversion: number | string | null;
-  ingredients: { name: string; unit: string | null } | null;
-};
+import { PurchaseLogRow } from '@/types';
 
 export default async function ProcurementPage() {
   const { data: purchases, error } = await supabase

@@ -5,13 +5,7 @@ import { redirect, notFound } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
-type IngredientRow = {
-  id: string;
-  name: string;
-  category: string;
-  unit: string;
-  low_stock_threshold: number | string | null;
-};
+import { Ingredient } from '@/types';
 
 export default async function EditIngredientPage({
   params,
@@ -25,7 +19,7 @@ export default async function EditIngredientPage({
     .select('id, name, category, unit, low_stock_threshold')
     .eq('id', id)
     .single()
-    .returns<IngredientRow>();
+    .returns<Ingredient>();
 
   if (error || !ingredient) notFound();
 
@@ -88,7 +82,7 @@ export default async function EditIngredientPage({
               <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
                 Kategori
               </label>
-              <select name="category" required defaultValue={ingredient.category} className="input-base" style={{ appearance: 'none' }}>
+              <select name="category" required defaultValue={ingredient.category ?? undefined} className="input-base" style={{ appearance: 'none' }}>
                 <option value="Beans">Biji Kopi</option>
                 <option value="Dairy">Susu & Dairy</option>
                 <option value="Syrup">Sirup</option>
@@ -100,7 +94,7 @@ export default async function EditIngredientPage({
               <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
                 Satuan (UoM)
               </label>
-              <select name="unit" required defaultValue={ingredient.unit} className="input-base" style={{ appearance: 'none' }}>
+              <select name="unit" required defaultValue={ingredient.unit ?? undefined} className="input-base" style={{ appearance: 'none' }}>
                 <option value="gr">Gram (gr)</option>
                 <option value="kg">Kilogram (kg)</option>
                 <option value="ml">Mililiter (ml)</option>

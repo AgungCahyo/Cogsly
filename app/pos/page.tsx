@@ -2,22 +2,9 @@
 import { supabase } from '@/lib/supabase';
 import { POSClient } from './POSClient';
 
+import { ProductRow } from '@/types';
+
 export const dynamic = 'force-dynamic';
-
-type ProductRecipeItemRow = {
-  ingredient_id: string;
-  amount_required: number | string | null;
-  ingredients: { average_price: number | string | null } | null;
-};
-
-type ProductRow = {
-  id: string;
-  name: string;
-  price: number | string | null;
-  operational_cost_buffer: number | string | null;
-  is_percentage_buffer: boolean | null;
-  recipe_items: ProductRecipeItemRow[] | null;
-};
 
 export default async function POSPage() {
   const { data: products } = await supabase
@@ -26,9 +13,9 @@ export default async function POSPage() {
     .returns<ProductRow[]>()
     .order('name');
 
-  const productsWithData = products?.map((p) => {
+    const productsWithData = products?.map((p) => {
     const recipe_items = (p.recipe_items ?? []).map((item) => ({
-      ingredient_id: item.ingredient_id,
+      ingredient_id: item.ingredient_id || '',
       amount_required: Number(item.amount_required) || 0,
     }));
     const rawHPP = (p.recipe_items ?? []).reduce((sum, item) => {

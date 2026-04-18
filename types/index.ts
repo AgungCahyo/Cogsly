@@ -25,9 +25,10 @@ export interface PurchasePoint {
 }
 
 export interface RecipeItemRow {
-  id: string;
+  id?: string;
+  ingredient_id?: string;
   amount_required: number | string | null;
-  ingredients: {
+  ingredients?: {
     name: string;
     unit: string | null;
     average_price: number | string | null;
@@ -50,4 +51,96 @@ export interface RecipeInput {
   operational_cost_buffer: number;
   is_percentage_buffer: boolean;
   items: { ingredient_id: string; amount_required: number }[];
+}
+
+// Recap & Analytics Types
+export interface SaleRow {
+  id: string;
+  date: string;
+  total_price: number | string;
+  total_hpp: number | string;
+}
+
+export interface SaleItemRow {
+  sale_id: string;
+  product_id: string;
+  quantity: number | string;
+  price: number | string;
+  hpp: number | string;
+  products: { name: string } | null;
+}
+
+export interface PurchaseRow {
+  id: string;
+  date: string;
+  price: number | string;
+  quantity: number | string;
+  supplier: string | null;
+  ingredients: { name: string; category: string | null; unit?: string | null } | null;
+}
+
+export interface PurchaseLogRow extends Omit<PurchaseRow, 'ingredients'> {
+  evidence_url: string | null;
+  purchase_unit: string | null;
+  unit_conversion: number | string | null;
+  ingredients: { name: string; unit: string | null } | null;
+}
+
+export interface PeriodStats {
+  revenue: number;
+  hpp: number;
+  grossProfit: number;
+  expenses: number;
+  netCashflow: number;
+  orders: number;
+  purchaseCount: number;
+  margin: number;
+}
+
+export interface ChartPoint {
+  date: string;
+  revenue: number;
+  hpp: number;
+  profit: number;
+  expenses: number;
+  cashflow: number;
+  orders: number;
+}
+
+export interface TopProduct {
+  name: string;
+  qty: number;
+  revenue: number;
+}
+
+export interface ExpenseCategory {
+  category: string;
+  amount: number;
+}
+
+export type RecapTab = 'daily' | 'weekly' | 'monthly';
+export type ChartMode = 'revenue' | 'cashflow';
+
+// POS Specific Types
+export interface POSRecipeItem {
+  ingredient_id: string;
+  amount_required: number;
+}
+
+export interface POSProduct {
+  id: string;
+  name: string;
+  price: number;
+  hpp: number;
+  recipe_items?: POSRecipeItem[] | null;
+}
+
+export type CartItem = POSProduct & { qty: number };
+
+export interface SaleCartItem {
+  id: string;
+  price: number;
+  hpp: number;
+  qty: number;
+  recipe_items?: POSRecipeItem[] | null;
 }

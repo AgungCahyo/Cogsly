@@ -4,20 +4,7 @@ import { useState } from 'react';
 import { ShoppingBag, Minus, Plus, CreditCard, Trash2, Receipt } from 'lucide-react';
 import { processSale } from './actions';
 
-type POSRecipeItem = {
-  ingredient_id: string;
-  amount_required: number;
-};
-
-export type POSProduct = {
-  id: string;
-  name: string;
-  price: number;
-  hpp: number;
-  recipe_items?: POSRecipeItem[] | null;
-};
-
-type CartItem = POSProduct & { qty: number };
+import { POSProduct, CartItem } from '@/types';
 
 export function POSClient({ products }: { products: POSProduct[] }) {
   const [cart, setCart] = useState<CartItem[]>([]);

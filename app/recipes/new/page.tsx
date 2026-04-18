@@ -6,30 +6,16 @@ import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
-type IngredientRow = {
-  id: string;
-  name: string;
-  unit: string | null;
-  average_price: number | string | null;
-  stock: number | string | null;
-};
-
-type SubmitRecipeInput = {
-  name: string;
-  price: number;
-  operational_cost_buffer: number;
-  is_percentage_buffer: boolean;
-  items: { ingredient_id: string; amount_required: number }[];
-};
+import { IngredientOption, RecipeInput } from '@/types';
 
 export default async function NewRecipePage() {
   const { data: ingredients } = await supabase
     .from('ingredients')
     .select('id, name, unit, average_price, stock')
-    .returns<IngredientRow[]>()
+    .returns<IngredientOption[]>()
     .order('name');
 
-  async function submitRecipe(data: SubmitRecipeInput) {
+  async function submitRecipe(data: RecipeInput) {
     'use server';
     const { data: productData, error: productError } = await supabase
       .from('products')

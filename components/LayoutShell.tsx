@@ -11,6 +11,7 @@ import {
   ShoppingBag,
   Menu,
   X,
+  BarChart3,
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -25,6 +26,7 @@ const navigation = [
   { name: 'Pembelian', href: '/procurement', icon: ShoppingCart, description: 'Log pengadaan' },
   { name: 'Resep & HPP', href: '/recipes', icon: UtensilsCrossed, description: 'Harga pokok' },
   { name: 'Kasir', href: '/pos', icon: ShoppingBag, description: 'Proses transaksi' },
+  { name: 'Rekap', href: '/recap', icon: BarChart3, description: 'Laporan performa' },
 ];
 
 export function LayoutShell({ children }: { children: React.ReactNode }) {

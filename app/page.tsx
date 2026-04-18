@@ -5,45 +5,13 @@ import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
 
-type IngredientRow = {
-  id: string;
-  name: string;
-  stock: number | string | null;
-  low_stock_threshold: number | string | null;
-  average_price: number | string | null;
-};
-
-type ProductRecipeItemRow = {
-  amount_required: number | string | null;
-  ingredients: { average_price: number | string | null } | null;
-};
-
-type ProductRow = {
-  price: number | string | null;
-  operational_cost_buffer: number | string | null;
-  is_percentage_buffer: boolean | null;
-  recipe_items: ProductRecipeItemRow[] | null;
-};
-
-type IngredientOption = {
-  id: string;
-  name: string;
-  unit: string | null;
-};
-
-type PurchasePoint = {
-  date: string | number | Date;
-  price: number | string;
-  quantity: number | string;
-  purchase_unit: string | null;
-  unit_conversion: number | string | null;
-};
+import { IngredientOption, ProductRow, PurchasePoint, Ingredient } from '@/types';
 
 export default async function Dashboard() {
   const { data: ingredients } = await supabase
     .from('ingredients')
     .select('id, name, stock, low_stock_threshold, average_price')
-    .returns<IngredientRow[]>();
+    .returns<Ingredient[]>();
 
   let totalAssetValue = 0;
   let lowStockCount = 0;
@@ -59,7 +27,7 @@ export default async function Dashboard() {
 
   const { data: products } = await supabase
     .from('products')
-    .select(`price, operational_cost_buffer, is_percentage_buffer, recipe_items(amount_required, ingredients(average_price))`)
+    .select(`id, name, price, operational_cost_buffer, is_percentage_buffer, recipe_items(amount_required, ingredients(average_price))`)
     .returns<ProductRow[]>();
 
   let totalMarkupPercent = 0;

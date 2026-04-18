@@ -3,13 +3,7 @@ import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
-type PurchaseRow = {
-  date: string;
-  price: number | string;
-  quantity: number | string;
-  purchase_unit: string | null;
-  unit_conversion: number | string | null;
-};
+import { PurchasePoint } from '@/types';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -25,7 +19,7 @@ export async function GET(request: Request) {
     .eq('ingredient_id', ingredientId)
     .order('date', { ascending: true })
     .limit(30)
-    .returns<PurchaseRow[]>();
+    .returns<PurchasePoint[]>();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

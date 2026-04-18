@@ -3,18 +3,7 @@
 import { supabase } from '@/lib/supabase';
 import { revalidatePath } from 'next/cache';
 
-type SaleCartRecipeItem = {
-  ingredient_id: string;
-  amount_required: number;
-};
-
-export type SaleCartItem = {
-  id: string;
-  price: number;
-  hpp: number;
-  qty: number;
-  recipe_items?: SaleCartRecipeItem[] | null;
-};
+import { SaleCartItem } from '@/types';
 
 export async function processSale(cart: SaleCartItem[]) {
   // 1. Calculate totals

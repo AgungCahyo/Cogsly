@@ -6,35 +6,7 @@ import { RecipeBuilderForm } from '../new/RecipeBuilderForm';
 
 export const dynamic = 'force-dynamic';
 
-type IngredientRow = {
-  id: string;
-  name: string;
-  unit: string | null;
-  average_price: number | string | null;
-  stock: number | string | null;
-};
-
-type RecipeItemRow = {
-  ingredient_id: string;
-  amount_required: number | string;
-};
-
-type ProductRow = {
-  id: string;
-  name: string;
-  price: number | string;
-  operational_cost_buffer: number | string | null;
-  is_percentage_buffer: boolean | null;
-  recipe_items: RecipeItemRow[] | null;
-};
-
-type SubmitRecipeInput = {
-  name: string;
-  price: number;
-  operational_cost_buffer: number;
-  is_percentage_buffer: boolean;
-  items: { ingredient_id: string; amount_required: number }[];
-};
+import { IngredientOption, ProductRow, RecipeInput } from '@/types';
 
 export default async function EditRecipePage({
   params,
@@ -46,7 +18,7 @@ export default async function EditRecipePage({
   const { data: ingredients } = await supabase
     .from('ingredients')
     .select('id, name, unit, average_price, stock')
-    .returns<IngredientRow[]>()
+    .returns<IngredientOption[]>()
     .order('name');
 
   const { data: product, error } = await supabase
@@ -64,12 +36,12 @@ export default async function EditRecipePage({
     operational_cost_buffer: Number(product.operational_cost_buffer) || 0,
     is_percentage_buffer: Boolean(product.is_percentage_buffer),
     items: (product.recipe_items ?? []).map((i) => ({
-      ingredient_id: i.ingredient_id,
+      ingredient_id: i.ingredient_id || '',
       amount_required: Number(i.amount_required) || 0,
     })),
   };
 
-  async function submitRecipe(data: SubmitRecipeInput) {
+  async function submitRecipe(data: RecipeInput) {
     'use server';
 
     const name = (data.name ?? '').trim();
