@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/server';
 import { UtensilsCrossed, Plus, Calculator, Pencil, TrendingUp, AlertTriangle, ChefHat } from 'lucide-react';
 import Link from 'next/link';
 
@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic';
 import { RecipeItemRow, ProductRow } from '@/types';
 
 export default async function RecipesPage() {
+  const supabase = await createClient();
   const { data: products, error } = await supabase
     .from('products')
     .select(`id, name, price, operational_cost_buffer, is_percentage_buffer,
@@ -25,7 +26,6 @@ export default async function RecipesPage() {
     const margin = price - totalHPP;
     const marginPercent = price > 0 ? (margin / price) * 100 : 0;
 
-    // Check which ingredients have insufficient stock for 1 serving
     const lowStockIngredients = (product.recipe_items ?? []).filter(item => {
       const needed = Number(item.amount_required) || 0;
       const stock = Number(item.ingredients?.stock) || 0;
@@ -36,150 +36,155 @@ export default async function RecipesPage() {
   }) || [];
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-8">
+    <div className="p-6 lg:p-10 max-w-7xl mx-auto space-y-10">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-end sm:items-center justify-between gap-6 border-b border-zinc-200 pb-8">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: 'var(--gold)', fontFamily: 'var(--font-mono)' }}>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 mb-2 font-mono">
             ◆ Resep & HPP
           </p>
-          <h1 className="text-3xl font-bold" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-serif)' }}>
+          <h1 className="text-4xl font-bold tracking-tight text-zinc-950 font-serif">
             Resep & Harga Pokok
           </h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+          <p className="text-sm mt-1.5 text-zinc-500 font-medium tracking-tight">
             Kelola produk, resep, dan analisis margin keuntungan
           </p>
         </div>
-        <Link href="/recipes/new" className="btn-primary">
+        <Link 
+          href="/recipes/new" 
+          className="inline-flex items-center gap-2.5 bg-zinc-950 text-white px-6 py-3 rounded-2xl font-bold text-sm transition-all hover:bg-zinc-800 hover:shadow-xl hover:shadow-zinc-950/10"
+        >
           <Plus className="w-4 h-4" />
           Buat Resep
         </Link>
       </div>
 
-      {/* Summary */}
+      {/* Summary strips */}
       {productsWithHPP.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="p-4 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-            <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Total Produk</p>
-            <p className="text-2xl font-bold stat-number" style={{ color: 'var(--text-primary)' }}>{productsWithHPP.length}</p>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white border border-zinc-200 rounded-2xl px-6 py-5 shadow-sm">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-1">Total Produk</p>
+            <p className="text-3xl font-bold font-mono tracking-tighter text-zinc-950">{productsWithHPP.length}</p>
           </div>
-          <div className="p-4 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-            <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Rata-rata Margin</p>
-            <p className="text-2xl font-bold stat-number" style={{ color: 'var(--success)' }}>
+          <div className="bg-white border border-zinc-200 rounded-2xl px-6 py-5 shadow-sm">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-1">Rata-rata Margin</p>
+            <p className="text-3xl font-bold font-mono tracking-tighter text-zinc-950">
               {productsWithHPP.length > 0
                 ? `${(productsWithHPP.reduce((s, p) => s + p.marginPercent, 0) / productsWithHPP.length).toFixed(1)}%`
                 : '—'}
             </p>
           </div>
-          <div className="p-4 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-            <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Produk Profitable</p>
-            <p className="text-2xl font-bold stat-number" style={{ color: 'var(--gold)' }}>
+          <div className="bg-white border border-zinc-200 rounded-2xl px-6 py-5 shadow-sm">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-1">Profitable</p>
+            <p className="text-3xl font-bold font-mono tracking-tighter text-zinc-950">
               {productsWithHPP.filter(p => p.margin > 0).length}
             </p>
           </div>
-          <div className="p-4 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-            <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Stok Kurang</p>
-            <p className="text-2xl font-bold stat-number" style={{ color: productsWithHPP.filter(p => p.lowStockIngredients.length > 0).length > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>
+          <div className="bg-white border border-zinc-200 rounded-2xl px-6 py-5 shadow-sm">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-1">Stok Kurang</p>
+            <p className={`text-3xl font-bold font-mono tracking-tighter ${productsWithHPP.filter(p => p.lowStockIngredients.length > 0).length > 0 ? 'text-zinc-950' : 'text-zinc-200'}`}>
               {productsWithHPP.filter(p => p.lowStockIngredients.length > 0).length}
             </p>
           </div>
         </div>
       )}
 
-      {/* Product cards grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      {/* Recipes Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {error ? (
-          <div className="col-span-full p-8 text-center text-danger">
+          <div className="col-span-full p-20 text-center font-bold text-zinc-950">
             Gagal memuat resep: {error.message}
           </div>
         ) : productsWithHPP.length === 0 ? (
-          <div className="col-span-full h-full flex flex-col items-center justify-center text-center p-16 border-2 border-dashed border-border rounded-2xl bg-bg-card/30">
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4 bg-bg-elevated border border-border">
-              <ChefHat className="w-8 h-8 text-text-muted" />
+          <div className="col-span-full p-20 flex flex-col items-center justify-center text-center bg-zinc-50 border-2 border-dashed border-zinc-200 rounded-[2.5rem]">
+            <div className="w-20 h-20 rounded-3xl bg-white border border-zinc-100 flex items-center justify-center mb-6 shadow-sm">
+              <ChefHat className="w-10 h-10 text-zinc-300" />
             </div>
-            <h3 className="text-lg font-bold mb-2 text-text-primary font-serif">
-              Belum ada resep
-            </h3>
-            <p className="text-sm mb-6 max-w-md text-text-secondary">
-              Buat resep produk pertama Anda. Sistem akan otomatis menghitung HPP berdasarkan harga bahan baku terkini.
+            <h3 className="text-xl font-bold text-zinc-950 mb-2 font-serif">Belum ada resep</h3>
+            <p className="text-sm text-zinc-500 max-w-sm mb-8 font-medium leading-relaxed">
+              Buat resep produk pertama Anda. Sistem akan menghitung HPP otomatis berdasarkan harga bahan baku terkini.
             </p>
-            <Link href="/recipes/new" className="btn-ghost text-sm">Buat Resep Pertama</Link>
+            <Link 
+              href="/recipes/new" 
+              className="bg-zinc-950 text-white px-8 py-3.5 rounded-2xl font-bold text-sm transition-all hover:bg-zinc-800"
+            >
+              Buat Resep Pertama
+            </Link>
           </div>
         ) : (
           productsWithHPP.map((product) => (
             <div
               key={product.id}
-              className={`rounded-2xl p-5 flex flex-col gap-4 card-interactive ${product.lowStockIngredients.length > 0 ? 'border border-danger/20' : ''}`}
+              className={`group bg-white rounded-3xl p-7 border transition-all duration-300 flex flex-col gap-6 hover:shadow-2xl hover:shadow-zinc-950/5 ${
+                product.lowStockIngredients.length > 0 ? 'border-zinc-950 ring-1 ring-zinc-950' : 'border-zinc-200'
+              }`}
             >
               {/* Card top */}
               <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 bg-gold/10 text-gold"
-                  >
+                <div className="flex items-center gap-4">
+                  <div className="w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm bg-zinc-100 text-zinc-400 group-hover:bg-zinc-950 group-hover:text-white transition-colors">
                     {product.name.charAt(0)}
                   </div>
                   <div>
-                    <h3 className="font-bold leading-tight text-text-primary">
+                    <h3 className="font-bold text-zinc-950 leading-tight">
                       {product.name}
                     </h3>
-                    <p className="text-xs mt-0.5 text-text-muted">
-                      {(product.recipe_items ?? []).length} bahan
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mt-1">
+                      {(product.recipe_items ?? []).length} Bahan Baku
                     </p>
                   </div>
                 </div>
                 <Link
                   href={`/recipes/${product.id}`}
-                  className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg item-interactive"
+                  className="p-2 bg-zinc-50 text-zinc-400 rounded-xl hover:bg-zinc-950 hover:text-white transition-all border border-transparent hover:border-zinc-950"
                 >
-                  <Pencil className="w-3 h-3" />
-                  Edit
+                  <Pencil className="w-4 h-4" />
                 </Link>
               </div>
 
-              {/* Low stock warning */}
-              {product.lowStockIngredients.length > 0 && (
-                <div
-                  className="flex items-start gap-2 px-3 py-2.5 rounded-xl text-xs bg-danger-dim border border-danger/20"
-                >
-                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-danger" />
-                  <div className="text-danger">
-                    <p className="font-semibold mb-0.5">Stok bahan tidak cukup untuk 1 porsi:</p>
-                    {product.lowStockIngredients.map(item => (
-                      <p key={item.id} className="opacity-85">
-                        {item.ingredients?.name} — butuh {Number(item.amount_required).toLocaleString('id-ID')} {item.ingredients?.unit},
-                        ada {Number(item.ingredients?.stock).toLocaleString('id-ID')} {item.ingredients?.unit}
-                      </p>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Sell price */}
-              <div
-                className="flex items-center justify-between p-3 rounded-xl bg-bg-elevated border border-border"
-              >
-                <span className="text-xs text-text-muted">Harga Jual</span>
-                <span className="font-bold stat-number text-text-primary">
+              {/* Price Display */}
+              <div className="bg-zinc-50 border border-zinc-100 rounded-2xl px-5 py-4 flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Harga Jual</span>
+                <span className="font-bold font-mono text-base text-zinc-950 tracking-tighter">
                   Rp {Number(product.price).toLocaleString('id-ID')}
                 </span>
               </div>
 
-              {/* Ingredient list */}
-              <div className="space-y-1">
+              {/* Stock Warning UI */}
+              {product.lowStockIngredients.length > 0 && (
+                <div className="bg-zinc-950 text-white rounded-2xl px-5 py-4 space-y-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <AlertTriangle className="w-4 h-4 text-white" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest">Stok Tidak Cukup</span>
+                  </div>
+                  {product.lowStockIngredients.map(item => (
+                    <div key={item.id} className="text-[10px] flex justify-between font-medium text-zinc-400">
+                      <span>{item.ingredients?.name}</span>
+                      <span>Butuh {Number(item.amount_required).toLocaleString('id-ID')} {item.ingredients?.unit}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Ingredients List */}
+              <div className="space-y-2.5">
                 {(product.recipe_items ?? []).map((item) => {
                   const needed = Number(item.amount_required) || 0;
                   const stock = Number(item.ingredients?.stock) || 0;
                   const isInsufficient = needed > 0 && stock < needed;
                   return (
-                    <div key={item.id} className="flex items-center justify-between text-xs">
-                      <span
-                        className={`flex items-center gap-1.5 ${isInsufficient ? 'text-danger' : 'text-text-secondary'}`}
-                      >
-                        {isInsufficient && <AlertTriangle className="w-3 h-3 shrink-0" />}
-                        {item.ingredients?.name}
-                      </span>
-                      <span className={`stat-number ${isInsufficient ? 'text-danger' : 'text-text-muted'}`}>
+                    <div key={item.id} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {isInsufficient ? (
+                          <div className="w-1.5 h-1.5 rounded-full bg-zinc-950" />
+                        ) : (
+                          <div className="w-1.5 h-1.5 rounded-full bg-zinc-200" />
+                        )}
+                        <span className={`text-xs font-medium ${isInsufficient ? 'text-zinc-950 font-bold' : 'text-zinc-500'}`}>
+                          {item.ingredients?.name}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-bold font-mono text-zinc-400">
                         {needed.toLocaleString('id-ID')} {item.ingredients?.unit}
                       </span>
                     </div>
@@ -187,40 +192,37 @@ export default async function RecipesPage() {
                 })}
               </div>
 
-              {/* HPP breakdown */}
-              <div className="space-y-2 border-t border-border pt-4">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="flex items-center gap-1.5 text-text-secondary">
+              {/* Margin Breakdown */}
+              <div className="mt-auto pt-6 border-t border-zinc-100 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-zinc-400">
                     <Calculator className="w-3.5 h-3.5" />
-                    Total HPP
-                  </span>
-                  <span className="stat-number font-medium text-text-secondary">
+                    <span className="text-[10px] font-bold uppercase tracking-widest">Total HPP</span>
+                  </div>
+                  <span className="text-xs font-bold font-mono text-zinc-500 tracking-tighter">
                     Rp {Math.round(product.totalHPP).toLocaleString('id-ID')}
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-1.5 text-text-secondary">
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-zinc-400">
                     <TrendingUp className="w-3.5 h-3.5" />
-                    Margin
-                  </span>
-                  <div className="text-right">
-                    <span
-                      className={`font-bold stat-number ${product.margin >= 0 ? 'text-success' : 'text-danger'}`}
-                    >
+                    <span className="text-[10px] font-bold uppercase tracking-widest">Margin</span>
+                  </div>
+                  <div className="text-right flex items-center gap-2">
+                    <span className={`font-bold font-mono text-sm tracking-tighter ${product.margin >= 0 ? 'text-zinc-950' : 'text-zinc-300'}`}>
                       Rp {Math.round(product.margin).toLocaleString('id-ID')}
                     </span>
-                    <span
-                      className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-md font-medium ${product.margin >= 0 ? 'bg-success-dim text-success' : 'bg-danger-dim text-danger'}`}
-                    >
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider ${product.margin >= 0 ? 'bg-zinc-950 text-white' : 'bg-zinc-100 text-zinc-400'}`}>
                       {product.marginPercent.toFixed(1)}%
                     </span>
                   </div>
                 </div>
 
-                {/* Margin bar */}
-                <div className="h-1.5 rounded-full overflow-hidden mt-2 bg-bg-elevated">
+                {/* Progress Bar (Monochrome) */}
+                <div className="h-1 bg-zinc-100 rounded-full overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all ${product.margin >= 0 ? 'bg-success' : 'bg-danger'}`}
+                    className={`h-full transition-all duration-700 ${product.margin >= 0 ? 'bg-zinc-950' : 'bg-zinc-300'}`}
                     style={{
                       width: `${Math.min(100, Math.max(0, product.marginPercent))}%`,
                     }}

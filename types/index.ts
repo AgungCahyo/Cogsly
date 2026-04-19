@@ -144,3 +144,44 @@ export interface SaleCartItem {
   qty: number;
   recipe_items?: POSRecipeItem[] | null;
 }
+
+// Auth & Profiles
+export type UserRole = 'admin' | 'warehouse' | 'cashier' | 'waiter';
+
+export interface Profile {
+  id: string;
+  full_name: string | null;
+  role: UserRole;
+  created_at: string;
+}
+
+// Professional System Additions
+export interface Table {
+  id: string;
+  name: string;
+  status: 'available' | 'occupied' | 'reserved';
+  created_at: string;
+}
+
+export interface Order {
+  id: string;
+  table_id: string | null;
+  waiter_id: string | null;
+  customer_name: string | null;
+  status: 'pending' | 'paid' | 'cancelled';
+  payment_method: 'cash' | 'qris' | 'debit' | 'credit' | null;
+  total_price: number;
+  total_hpp: number;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface OrderItem {
+  id: string;
+  order_id: string;
+  product_id: string;
+  quantity: number;
+  price: number;
+  hpp: number;
+  created_at: string;
+}

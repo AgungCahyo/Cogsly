@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/server';
 import { PackagePlus, AlertTriangle, CheckCircle2, Pencil, Package } from 'lucide-react';
 import Link from 'next/link';
 
@@ -7,6 +7,7 @@ import { Ingredient } from '@/types';
 export const dynamic = 'force-dynamic';
 
 export default async function IngredientsPage() {
+  const supabase = await createClient();
   const { data: ingredients, error } = await supabase
     .from('ingredients')
     .select('*')
@@ -17,27 +18,24 @@ export default async function IngredientsPage() {
   const lowStockItems = ingredients?.filter(i => Number(i.stock) <= Number(i.low_stock_threshold)) ?? [];
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-8">
+    <div className="p-6 lg:p-10 max-w-7xl mx-auto space-y-10">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-end sm:items-center justify-between gap-6 border-b border-zinc-200 pb-8">
         <div>
-          <p
-            className="text-xs font-semibold uppercase tracking-widest mb-2"
-            style={{ color: 'var(--gold)', fontFamily: 'var(--font-mono)' }}
-          >
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 mb-2 font-mono">
             ◆ Inventori
           </p>
-          <h1
-            className="text-3xl font-bold"
-            style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-serif)' }}
-          >
+          <h1 className="text-4xl font-bold tracking-tight text-zinc-950 font-serif">
             Bahan Baku
           </h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+          <p className="text-sm mt-1.5 text-zinc-500 font-medium tracking-tight">
             Kelola material dan pantau level stok secara real-time
           </p>
         </div>
-        <Link href="/ingredients/new" className="btn-primary">
+        <Link 
+          href="/ingredients/new" 
+          className="inline-flex items-center gap-2.5 bg-zinc-950 text-white px-6 py-3 rounded-2xl font-bold text-sm transition-all hover:bg-zinc-800 hover:shadow-xl hover:shadow-zinc-950/10"
+        >
           <PackagePlus className="w-4 h-4" />
           Tambah Bahan
         </Link>
@@ -45,167 +43,140 @@ export default async function IngredientsPage() {
 
       {/* Summary strip */}
       {!error && ingredients && ingredients.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: 'Total Bahan', value: totalItems, color: 'var(--text-primary)' },
-            { label: 'Stok Aman', value: totalItems - lowStockItems.length, color: 'var(--success)' },
-            { label: 'Stok Menipis', value: lowStockItems.length, color: lowStockItems.length > 0 ? 'var(--danger)' : 'var(--text-secondary)' },
-            { label: 'Kategori', value: new Set(ingredients.map(i => i.category)).size, color: 'var(--gold)' },
+            { label: 'Total Bahan', value: totalItems },
+            { label: 'Stok Aman', value: totalItems - lowStockItems.length },
+            { label: 'Stok Menipis', value: lowStockItems.length, isDanger: lowStockItems.length > 0 },
+            { label: 'Kategori', value: new Set(ingredients.map(i => i.category)).size },
           ].map(s => (
             <div
               key={s.label}
-              className="p-4 rounded-xl"
-              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+              className="px-6 py-5 bg-white border border-zinc-200 rounded-2xl shadow-sm"
             >
-              <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
-              <p className="text-2xl font-bold stat-number" style={{ color: s.color }}>{s.value}</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-1">{s.label}</p>
+              <p className={`text-3xl font-bold font-mono tracking-tighter ${s.isDanger ? 'text-zinc-950' : 'text-zinc-950'}`}>
+                {s.value}
+              </p>
             </div>
           ))}
         </div>
       )}
 
       {/* Table */}
-      <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-        {/* Table header bar */}
-        <div
-          className="px-6 py-4 flex items-center justify-between"
-          style={{ borderBottom: '1px solid var(--border)' }}
-        >
-          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-            Daftar Bahan Baku
-          </p>
+      <div className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm shadow-zinc-950/5">
+        <div className="px-8 py-6 flex items-center justify-between border-b border-zinc-100 bg-zinc-50/30">
+          <p className="text-sm font-bold text-zinc-950 tracking-tight">Daftar Bahan Baku</p>
           {lowStockItems.length > 0 && (
-            <span className="badge badge-danger">
+            <span className="flex items-center gap-1.5 px-3 py-1 bg-zinc-950 text-white text-[10px] font-bold uppercase tracking-wider rounded-full">
               <AlertTriangle className="w-3 h-3" />
-              {lowStockItems.length} stok menipis
+              {lowStockItems.length} Stok Menipis
             </span>
           )}
         </div>
 
         {error ? (
-          <div className="p-12 text-center flex flex-col items-center gap-3">
-            <div
-              className="w-12 h-12 rounded-xl flex items-center justify-center"
-              style={{ background: 'var(--danger-dim)' }}
-            >
-              <AlertTriangle className="w-6 h-6" style={{ color: 'var(--danger)' }} />
+          <div className="p-16 text-center flex flex-col items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-zinc-100 flex items-center justify-center">
+              <AlertTriangle className="w-7 h-7 text-zinc-950" />
             </div>
-            <p className="font-medium" style={{ color: 'var(--danger)' }}>Gagal memuat data</p>
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{error.message}</p>
+            <div>
+              <p className="font-bold text-zinc-950">Gagal memuat data</p>
+              <p className="text-sm text-zinc-500 mt-1">{error.message}</p>
+            </div>
           </div>
         ) : !ingredients || ingredients.length === 0 ? (
-          <div className="p-16 flex flex-col items-center justify-center text-center">
-            <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
-              style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}
-            >
-              <Package className="w-7 h-7" style={{ color: 'var(--text-muted)' }} />
+          <div className="p-20 flex flex-col items-center justify-center text-center">
+            <div className="w-20 h-20 rounded-[2.5rem] bg-zinc-50 border border-zinc-100 flex items-center justify-center mb-6 shadow-inner">
+              <Package className="w-10 h-10 text-zinc-300" />
             </div>
-            <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-serif)' }}>
-              Belum ada bahan baku
-            </h3>
-            <p className="text-sm mb-6 max-w-sm" style={{ color: 'var(--text-secondary)' }}>
-              Mulai dengan menambahkan bahan pertama Anda. Ini memungkinkan pelacakan stok dan perhitungan HPP resep.
+            <h3 className="text-xl font-bold text-zinc-950 mb-2 font-serif">Belum ada bahan baku</h3>
+            <p className="text-sm text-zinc-500 max-w-sm mb-8 leading-relaxed font-medium">
+              Mulai dengan menambahkan bahan pertama Anda untuk pelacakan stok dan perhitungan HPP.
             </p>
-            <Link href="/ingredients/new" className="btn-ghost text-sm">
-              Tambah Sekarang
+            <Link 
+              href="/ingredients/new" 
+              className="bg-zinc-950 text-white px-8 py-3.5 rounded-2xl font-bold text-sm transition-all hover:bg-zinc-800"
+            >
+              Tambah Bahan Sekarang
             </Link>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full whitespace-nowrap text-left text-sm">
+            <table className="w-full whitespace-nowrap text-left border-collapse">
               <thead>
-                <tr style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border)' }}>
-                  {['Nama Bahan', 'Kategori', 'Level Stok', 'Harga Rata-rata', 'Status', ''].map(h => (
-                    <th
-                      key={h}
-                      className="px-6 py-3.5 text-xs font-semibold uppercase tracking-wider"
-                      style={{ color: 'var(--text-muted)' }}
-                    >
+                <tr className="bg-zinc-50/50 border-b border-zinc-100">
+                  {['Bahan Baku', 'Kategori', 'Level Stok', 'Harga Rata-rata', ''].map(h => (
+                    <th key={h} className="px-8 py-5 text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-400">
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody>
-                {ingredients.map((item, idx) => {
+              <tbody className="divide-y divide-zinc-100">
+                {ingredients.map((item) => {
                   const isLowStock = Number(item.stock) <= Number(item.low_stock_threshold);
                   return (
-                    <tr
-                      key={item.id}
-                      className="table-row-hover transition-colors"
-                      style={{ borderBottom: idx < ingredients.length - 1 ? '1px solid var(--border)' : 'none' }}
-                    >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${isLowStock ? 'bg-[var(--danger-dim)] text-[var(--danger)]' : 'bg-[var(--gold-muted)] text-[var(--gold)]'}`}
-                          >
+                    <tr key={item.id} className="group hover:bg-zinc-50/50 transition-colors">
+                      <td className="px-8 py-6">
+                        <div className="flex items-center gap-4">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs ring-1 transition-all ${
+                            isLowStock 
+                              ? 'bg-zinc-950 text-white ring-zinc-950' 
+                              : 'bg-zinc-100 text-zinc-400 ring-zinc-200 group-hover:bg-zinc-950 group-hover:text-white group-hover:ring-zinc-950'
+                          }`}>
                             {item.name.charAt(0).toUpperCase()}
                           </div>
-                          <span className="font-medium text-[var(--text-primary)]">
-                            {item.name}
-                          </span>
+                          <div>
+                            <p className="font-bold text-sm text-zinc-950">{item.name}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              {isLowStock ? (
+                                <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-950 bg-zinc-100 px-1.5 py-0.5 rounded">Low Stock</span>
+                              ) : (
+                                <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-300">Safe</span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className="text-xs px-2.5 py-1 rounded-md font-medium bg-[var(--bg-elevated)] text-[var(--text-secondary)] border border-[var(--border)]"
-                        >
+                      <td className="px-8 py-6">
+                        <span className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-600 uppercase tracking-wider">
                           {item.category}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-baseline gap-1">
-                          <span
-                            className={`text-lg font-bold stat-number ${isLowStock ? 'text-[var(--danger)]' : 'text-[var(--text-primary)]'}`}
-                          >
+                      <td className="px-8 py-6">
+                        <div className="flex items-baseline gap-1.5">
+                          <span className={`text-xl font-bold font-mono tracking-tighter ${isLowStock ? 'text-zinc-950' : 'text-zinc-950'}`}>
                             {item.stock}
                           </span>
-                          <span className="text-xs text-[var(--text-muted)]">{item.unit}</span>
+                          <span className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest">{item.unit}</span>
                         </div>
-                        {/* Mini progress bar */}
-                        <div
-                          className="mt-1.5 h-1 rounded-full overflow-hidden w-24 bg-[var(--bg-elevated)]"
-                        >
-                          <div
-                            className="h-full rounded-full transition-all"
-                            style={{
-                              width: `${Math.min(100, (Number(item.stock) / Math.max(Number(item.low_stock_threshold) * 3, 1)) * 100)}%`,
-                              backgroundColor: isLowStock ? 'var(--danger)' : 'var(--success)',
+                        {/* High contrast simple bar */}
+                        <div className="mt-2 h-1 bg-zinc-100 rounded-full w-28 overflow-hidden">
+                          <div 
+                            className={`h-full transition-all duration-700 ${isLowStock ? 'bg-zinc-950' : 'bg-zinc-300'}`}
+                            style={{ 
+                              width: `${Math.min(100, (Number(item.stock) / Math.max(Number(item.low_stock_threshold) * 2.5, 1)) * 100)}%` 
                             }}
                           />
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-[var(--text-secondary)]">
+                      <td className="px-8 py-6">
                         {Number(item.average_price) > 0 ? (
-                          <span className="stat-number text-sm">
+                          <div className="font-mono text-sm font-bold text-zinc-950 tracking-tighter">
                             Rp {Number(item.average_price).toLocaleString('id-ID')}
-                            <span className="text-xs ml-1 text-[var(--text-muted)]">/ {item.unit}</span>
-                          </span>
+                            <span className="text-[10px] ml-1.5 text-zinc-400 font-sans tracking-normal uppercase">/ {item.unit}</span>
+                          </div>
                         ) : (
-                          <span className="text-xs italic text-[var(--text-muted)]">Belum ada pembelian</span>
+                          <span className="text-[10px] font-bold italic text-zinc-300 uppercase tracking-widest">No Data</span>
                         )}
                       </td>
-                      <td className="px-6 py-4">
-                        {isLowStock ? (
-                          <span className="badge badge-danger">
-                            <AlertTriangle className="w-3 h-3" />
-                            Stok Menipis
-                          </span>
-                        ) : (
-                          <span className="badge badge-success">
-                            <CheckCircle2 className="w-3 h-3" />
-                            Aman
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
+                      <td className="px-8 py-6 text-right">
                         <Link
                           href={`/ingredients/${item.id}`}
-                          className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg item-interactive"
+                          className="inline-flex items-center gap-2 bg-white border border-zinc-200 px-4 py-2 rounded-xl text-xs font-bold transition-all hover:bg-zinc-950 hover:text-white hover:border-zinc-950"
                         >
-                          <Pencil className="w-3 h-3" />
+                          <Pencil className="w-3.5 h-3.5" />
                           Edit
                         </Link>
                       </td>

@@ -1,12 +1,13 @@
 // app/recap/page.tsx
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/server';
 import { RecapClient } from './RecapClient';
 
 export const dynamic = 'force-dynamic';
 
-import { SaleRow, SaleItemRow, PurchaseRow } from '@/types';
+import { Order, OrderItem, PurchaseRow } from '@/types';
 
 export default async function RecapPage() {
+  const supabase = await createClient();
   const now = new Date();
 
   const todayStart = new Date(now);
@@ -20,19 +21,19 @@ export default async function RecapPage() {
   monthStart.setDate(now.getDate() - 29);
   monthStart.setHours(0, 0, 0, 0);
 
-  // Fetch sales and purchases in parallel
-  const [{ data: sales }, { data: saleItems }, { data: purchases }] = await Promise.all([
+  // Fetch orders (replaces sales) and purchases in parallel
+  const [{ data: orders }, { data: orderItems }, { data: purchases }] = await Promise.all([
     supabase
-      .from('sales')
-      .select('id, date, total_price, total_hpp')
-      .gte('date', monthStart.toISOString())
-      .order('date', { ascending: true })
-      .returns<SaleRow[]>(),
+      .from('orders')
+      .select('*')
+      .eq('status', 'paid')
+      .gte('completed_at', monthStart.toISOString())
+      .order('completed_at', { ascending: true }),
 
     supabase
-      .from('sale_items')
-      .select('sale_id, product_id, quantity, price, hpp, products(name)')
-      .returns<SaleItemRow[]>(),
+      .from('order_items')
+      .select('order_id, product_id, quantity, price, hpp, products(name)')
+      .returns<any[]>(),
 
     supabase
       .from('purchases')
@@ -57,36 +58,28 @@ export default async function RecapPage() {
     dailyMap[key] = { revenue: 0, hpp: 0, orders: 0, expenses: 0 };
   }
 
-  const todaySales: SaleRow[] = [];
-  const weekSales: SaleRow[] = [];
-  const monthSales: SaleRow[] = [];
+  const todayOrders: any[] = [];
+  const weekOrders: any[] = [];
+  const monthOrders: any[] = [];
 
-  (sales || []).forEach(s => {
-    const sDate = new Date(s.date);
-    const key = sDate.toISOString().slice(0, 10);
+  // Payment method stats
+  const paymentStats: Record<string, number> = { cash: 0, qris: 0, debit: 0, credit: 0 };
+
+  (orders || []).forEach(o => {
+    const oDate = new Date(o.completed_at);
+    const key = oDate.toISOString().slice(0, 10);
     if (dailyMap[key]) {
-      dailyMap[key].revenue += Number(s.total_price);
-      dailyMap[key].hpp += Number(s.total_hpp);
+      dailyMap[key].revenue += Number(o.total_price);
+      dailyMap[key].hpp += Number(o.total_hpp);
       dailyMap[key].orders += 1;
     }
-    if (sDate >= todayStart) todaySales.push(s);
-    if (sDate >= weekStart) weekSales.push(s);
-    monthSales.push(s);
-  });
+    if (oDate >= todayStart) todayOrders.push(o);
+    if (oDate >= weekStart) weekOrders.push(o);
+    monthOrders.push(o);
 
-  const todayPurchases: PurchaseRow[] = [];
-  const weekPurchases: PurchaseRow[] = [];
-  const monthPurchases: PurchaseRow[] = [];
-
-  (purchases || []).forEach(p => {
-    const pDate = new Date(p.date);
-    const key = pDate.toISOString().slice(0, 10);
-    if (dailyMap[key]) {
-      dailyMap[key].expenses += Number(p.price);
+    if (o.payment_method) {
+      paymentStats[o.payment_method] = (paymentStats[o.payment_method] || 0) + Number(o.total_price);
     }
-    if (pDate >= todayStart) todayPurchases.push(p);
-    if (pDate >= weekStart) weekPurchases.push(p);
-    monthPurchases.push(p);
   });
 
   const chartData = Object.entries(dailyMap).map(([date, vals]) => ({
@@ -94,50 +87,64 @@ export default async function RecapPage() {
     revenue: Math.round(vals.revenue),
     hpp: Math.round(vals.hpp),
     profit: Math.round(vals.revenue - vals.hpp),
-    expenses: Math.round(vals.expenses),
-    cashflow: Math.round(vals.revenue - vals.expenses),
+    expenses: Math.round(vals.expenses), // Expenses calculated from purchases below
     orders: vals.orders,
   }));
 
+  // Map expenses to chartData from purchases
+  (purchases || []).forEach(p => {
+    const pDate = new Date(p.date);
+    const key = pDate.toISOString().slice(0, 10);
+    const chartEntry = chartData.find(c => c.date === key);
+    if (chartEntry) {
+      chartEntry.expenses += Number(p.price);
+    }
+  });
+
+  const chartDataWithCashflow = chartData.map((c) => ({
+    ...c,
+    cashflow: c.revenue - c.expenses,
+  }));
+
   // Summarize a period
-  function summarizeSales(rows: SaleRow[]) {
-    const revenue = rows.reduce((s, r) => s + Number(r.total_price), 0);
-    const hpp = rows.reduce((s, r) => s + Number(r.total_hpp), 0);
-    return { revenue: Math.round(revenue), hpp: Math.round(hpp), orders: rows.length };
-  }
-
-  function summarizePurchases(rows: PurchaseRow[]) {
-    const expenses = rows.reduce((s, r) => s + Number(r.price), 0);
-    return { expenses: Math.round(expenses), purchaseCount: rows.length };
-  }
-
-  function buildPeriodStats(salesRows: SaleRow[], purchaseRows: PurchaseRow[]) {
-    const { revenue, hpp, orders } = summarizeSales(salesRows);
-    const { expenses, purchaseCount } = summarizePurchases(purchaseRows);
+  function buildPeriodStats(orderRows: any[], purchaseRows: PurchaseRow[]) {
+    const revenue = orderRows.reduce((s, r) => s + Number(r.total_price), 0);
+    const hpp = orderRows.reduce((s, r) => s + Number(r.total_hpp), 0);
+    const ordersCount = orderRows.length;
+    
+    // Expenses from purchases filtered by date
+    // (In a real app, you'd filter purchaseRows properly here)
+    const expenses = purchaseRows.reduce((s, r) => s + Number(r.price), 0);
+    
     const grossProfit = revenue - hpp;
     const netCashflow = revenue - expenses;
     const margin = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
+    
     return {
       revenue,
       hpp,
       grossProfit,
       expenses,
       netCashflow,
-      orders,
-      purchaseCount,
+      orders: ordersCount,
+      purchaseCount: purchaseRows.length,
       margin,
     };
   }
 
-  const todayStats = buildPeriodStats(todaySales, todayPurchases);
-  const weekStats = buildPeriodStats(weekSales, weekPurchases);
-  const monthStats = buildPeriodStats(monthSales, monthPurchases);
+  // Filter purchases for start dates
+  const todayPurchases = (purchases || []).filter(p => new Date(p.date) >= todayStart);
+  const weekPurchases = (purchases || []).filter(p => new Date(p.date) >= weekStart);
+
+  const todayStats = buildPeriodStats(todayOrders, todayPurchases);
+  const weekStats = buildPeriodStats(weekOrders, weekPurchases);
+  const monthStats = buildPeriodStats(monthOrders, purchases || []);
 
   // Top products this month
   const productMap: Record<string, { name: string; qty: number; revenue: number }> = {};
-  const monthSaleIds = new Set(monthSales.map(s => s.id));
-  (saleItems || []).forEach(item => {
-    if (!monthSaleIds.has(item.sale_id)) return;
+  const monthOrderIds = new Set(monthOrders.map(o => o.id));
+  (orderItems || []).forEach(item => {
+    if (!monthOrderIds.has(item.order_id)) return;
     const pid = item.product_id;
     if (!productMap[pid]) {
       productMap[pid] = { name: item.products?.name ?? 'Unknown', qty: 0, revenue: 0 };
@@ -153,7 +160,7 @@ export default async function RecapPage() {
 
   // Top expense categories this month
   const categoryMap: Record<string, number> = {};
-  monthPurchases.forEach(p => {
+  (purchases || []).forEach(p => {
     const cat = p.ingredients?.category ?? 'Lainnya';
     categoryMap[cat] = (categoryMap[cat] ?? 0) + Number(p.price);
   });
@@ -167,9 +174,10 @@ export default async function RecapPage() {
       todayStats={todayStats}
       weekStats={weekStats}
       monthStats={monthStats}
-      chartData={chartData}
+      chartData={chartDataWithCashflow}
       topProducts={topProducts}
       topExpenseCategories={topExpenseCategories}
+      paymentStats={paymentStats}
     />
   );
 }

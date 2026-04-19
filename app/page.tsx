@@ -1,13 +1,27 @@
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/server';
 import { Wallet, TrendingUp, PackageSearch, AlertTriangle, Activity, ArrowUpRight, ChevronRight } from "lucide-react";
-import { IngredientPriceFluctuation } from '@/components/IngredientPriceFluctuation';
+import { IngredientPriceFluctuation } from '@/components/ingredients/IngredientPriceFluctuation';
 import Link from 'next/link';
+import { effectiveRole } from '@/lib/auth/access-policy';
 
 export const dynamic = 'force-dynamic';
 
-import { IngredientOption, ProductRow, PurchasePoint, Ingredient } from '@/types';
+import { IngredientOption, ProductRow, PurchasePoint, Ingredient, UserRole } from '@/types';
 
 export default async function Dashboard() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: profileRow } = user
+    ? await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+    : { data: null };
+  const role = effectiveRole(profileRow?.role as UserRole | undefined);
+
+  const canInventory = role === 'admin' || role === 'warehouse';
+  const canRecipes = role === 'admin';
+  const canSeePurchaseTrend = role === 'admin' || role === 'warehouse' || role === 'cashier';
+
   const { data: ingredients } = await supabase
     .from('ingredients')
     .select('id, name, stock, low_stock_threshold, average_price')
@@ -51,32 +65,42 @@ export default async function Dashboard() {
   const avgMarkup = validProducts > 0 ? totalMarkupPercent / validProducts : 0;
   const profitProjection = totalAssetValue * avgMarkup;
 
-  const { data: ingredientOptions } = await supabase
-    .from('ingredients')
-    .select('id, name, unit')
-    .order('name')
-    .returns<IngredientOption[]>();
+  const inventoryHref = canInventory ? '/ingredients' : '/pos';
+  const recipesHref = canRecipes ? '/recipes' : '/pos';
 
-  const { data: latestPurchase } = await supabase
-    .from('purchases')
-    .select('ingredient_id, date')
-    .order('date', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-    .returns<{ ingredient_id: string; date: string } | null>();
+  let ingredientOptions: IngredientOption[] = [];
+  let initialIngredientId: string | null = null;
+  let initialPurchases: PurchasePoint[] = [];
 
-  const initialIngredientId =
-    latestPurchase?.ingredient_id ?? ingredientOptions?.[0]?.id ?? null;
+  if (canSeePurchaseTrend) {
+    const { data: opts } = await supabase
+      .from('ingredients')
+      .select('id, name, unit')
+      .order('name')
+      .returns<IngredientOption[]>();
+    ingredientOptions = opts ?? [];
 
-  const { data: initialPurchases } = initialIngredientId
-    ? await supabase
+    const { data: latestPurchase } = await supabase
+      .from('purchases')
+      .select('ingredient_id, date')
+      .order('date', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .returns<{ ingredient_id: string; date: string } | null>();
+
+    initialIngredientId = latestPurchase?.ingredient_id ?? ingredientOptions[0]?.id ?? null;
+
+    if (initialIngredientId) {
+      const { data: purchases } = await supabase
         .from('purchases')
         .select('date, price, quantity, purchase_unit, unit_conversion')
         .eq('ingredient_id', initialIngredientId)
         .order('date', { ascending: true })
         .limit(30)
-        .returns<PurchasePoint[]>()
-    : { data: [] as PurchasePoint[] };
+        .returns<PurchasePoint[]>();
+      initialPurchases = purchases ?? [];
+    }
+  }
 
   const stats = [
     {
@@ -84,18 +108,14 @@ export default async function Dashboard() {
       sublabel: 'Total stok tersedia',
       value: `Rp ${Math.round(totalAssetValue).toLocaleString('id-ID')}`,
       icon: Wallet,
-      accentColor: 'var(--gold)',
-      accentBg: 'var(--gold-muted)',
-      href: '/ingredients',
+      href: inventoryHref,
     },
     {
       label: 'Estimasi Laba',
       sublabel: `Rata-rata markup ${(avgMarkup * 100).toFixed(1)}%`,
       value: `Rp ${Math.round(profitProjection).toLocaleString('id-ID')}`,
       icon: TrendingUp,
-      accentColor: 'var(--success)',
-      accentBg: 'var(--success-dim)',
-      href: '/recipes',
+      href: recipesHref,
     },
     {
       label: 'Stok Menipis',
@@ -104,133 +124,138 @@ export default async function Dashboard() {
         : 'Semua stok aman',
       value: `${lowStockCount} Item`,
       icon: lowStockCount > 0 ? AlertTriangle : PackageSearch,
-      accentColor: lowStockCount > 0 ? 'var(--danger)' : 'var(--text-muted)',
-      accentBg: lowStockCount > 0 ? 'var(--danger-dim)' : 'rgba(74,67,48,0.2)',
-      href: '/ingredients',
+      isWarning: lowStockCount > 0,
+      href: inventoryHref,
     },
   ];
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-8">
+    <div className="p-6 lg:p-10 max-w-7xl mx-auto space-y-10">
       {/* Header */}
-      <div className="flex items-start justify-between pt-2">
+      <div className="flex items-end justify-between border-b border-zinc-200 pb-8">
         <div>
-          <p
-            className="text-xs font-semibold uppercase tracking-widest mb-2"
-            style={{ color: 'var(--gold)', fontFamily: 'var(--font-mono)' }}
-          >
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 mb-2 font-mono">
             ◆ Dasbor Utama
           </p>
-          <h1
-            className="text-3xl font-bold leading-tight"
-            style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-serif)' }}
-          >
+          <h1 className="text-4xl font-bold tracking-tight text-zinc-950 font-serif">
             Intelijen Bisnis
           </h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-            Pantau performa dan kesehatan stok secara real-time
+          <p className="text-sm mt-1.5 text-zinc-500 font-medium tracking-tight">
+            Analisis performa dan kesehatan inventori secara real-time
           </p>
         </div>
-        <div
-          className="hidden sm:flex items-center gap-2 text-xs px-3 py-2 rounded-lg"
-          style={{
-            border: '1px solid var(--border)',
-            background: 'var(--bg-card)',
-            color: 'var(--text-secondary)',
-          }}
-        >
-          <span className="w-1.5 h-1.5 rounded-full pulse-dot" style={{ background: 'var(--success)' }} />
-          <Activity className="w-3 h-3" />
-          Data langsung
+        <div className="hidden sm:flex items-center gap-2.5 text-[10px] font-bold uppercase tracking-widest px-4 py-2.5 rounded-full bg-zinc-100 text-zinc-600 border border-zinc-200">
+          <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-pulse" />
+          <Activity className="w-3.5 h-3.5" />
+          Data Langsung
         </div>
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {stats.map(({ label, sublabel, value, icon: Icon, accentColor, accentBg, href }) => (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {stats.map(({ label, sublabel, value, icon: Icon, href, isWarning }) => (
           <Link
             key={label}
             href={href}
-            className="group block rounded-2xl p-5 card-interactive"
+            className="group block bg-white border border-zinc-200 rounded-3xl p-7 transition-all duration-300 hover:border-zinc-950 hover:shadow-2xl hover:shadow-zinc-950/5 relative overflow-hidden"
           >
-            <div className="flex items-start justify-between mb-5">
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{ background: accentBg }}
-              >
-                <Icon className="w-4.5 h-4.5" style={{ color: accentColor, width: '18px', height: '18px' }} />
+            <div className="flex items-start justify-between mb-8">
+              <div className={cn(
+                "w-12 h-12 rounded-2xl flex items-center justify-center transition-colors shadow-sm",
+                isWarning ? "bg-zinc-950 text-white" : "bg-zinc-50 text-zinc-500 group-hover:bg-zinc-950 group-hover:text-white"
+              )}>
+                <Icon className="w-5 h-5" />
               </div>
-              <ArrowUpRight
-                className="w-4 h-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-                style={{ color: 'var(--text-muted)' }}
-              />
+              <ArrowUpRight className="w-5 h-5 text-zinc-300 transition-all duration-300 group-hover:text-zinc-950 group-hover:translate-x-1 group-hover:-translate-y-1" />
             </div>
-            <p className="text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>{label}</p>
-            <p
-              className="text-2xl font-bold tracking-tight mb-1 stat-number"
-              style={{ color: accentColor }}
-            >
+            
+            <p className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-1.5">{label}</p>
+            <p className={cn(
+              "text-3xl font-bold tracking-tighter font-mono mb-2 transition-colors",
+              isWarning ? "text-zinc-950" : "text-zinc-950"
+            )}>
               {value}
             </p>
-            <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{sublabel}</p>
+            <p className="text-xs font-medium text-zinc-500">{sublabel}</p>
           </Link>
         ))}
       </div>
 
       {/* Quick actions */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: 'Tambah Bahan', href: '/ingredients/new', desc: 'Daftarkan bahan baku baru' },
-          { label: 'Catat Pembelian', href: '/procurement/new', desc: 'Log pengadaan material' },
-          { label: 'Buat Resep', href: '/recipes/new', desc: 'Hitung HPP produk baru' },
-          { label: 'Buka Kasir', href: '/pos', desc: 'Mulai proses transaksi' },
-        ].map(item => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="group p-4 rounded-xl card-interactive"
-          >
-            <div className="flex items-center justify-between mb-1.5">
-              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{item.label}</p>
-              <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" style={{ color: 'var(--gold)' }} />
-            </div>
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{item.desc}</p>
-          </Link>
-        ))}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {(
+          [
+            {
+              label: 'Tambah Bahan',
+              href: '/ingredients/new',
+              desc: 'Daftar inventory baru',
+              roles: ['admin', 'warehouse'] as const,
+            },
+            {
+              label: 'Catat Pembelian',
+              href: '/procurement/new',
+              desc: 'Log pengadaan material',
+              roles: ['admin', 'warehouse'] as const,
+            },
+            {
+              label: 'Buat Resep',
+              href: '/recipes/new',
+              desc: 'Hitung HPP produk',
+              roles: ['admin'] as const,
+            },
+            {
+              label: 'Buka Kasir',
+              href: '/pos',
+              desc: 'Mulai transaksi',
+              roles: ['admin', 'cashier', 'waiter'] as const,
+            },
+          ] as const
+        )
+          .filter((item) => (item.roles as readonly UserRole[]).includes(role))
+          .map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="group p-5 bg-white border border-zinc-200 rounded-2xl transition-all hover:border-zinc-950 hover:bg-zinc-950 hover:text-white"
+            >
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-sm font-bold tracking-tight">{item.label}</p>
+                <ChevronRight className="w-4 h-4 text-zinc-300 group-hover:text-white transition-transform group-hover:translate-x-1" />
+              </div>
+              <p className="text-[10px] font-medium text-zinc-400 group-hover:text-zinc-300 transition-colors uppercase tracking-widest">
+                {item.desc}
+              </p>
+            </Link>
+          ))}
       </div>
 
-      {/* Chart */}
-      <div
-        className="rounded-2xl overflow-hidden"
-        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
-      >
-        <div
-          className="flex items-center justify-between px-6 py-5"
-          style={{ borderBottom: '1px solid var(--border)' }}
-        >
-          <div>
-            <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-              Tren Harga Beli Bahan
-            </h2>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-              Harga per satuan tiap transaksi pembelian — bukan rata-rata keseluruhan
-            </p>
+      {/* Chart Section */}
+      {canSeePurchaseTrend && (
+        <div className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm shadow-zinc-950/5">
+          <div className="flex items-center justify-between px-8 py-6 border-b border-zinc-100 bg-zinc-50/30">
+            <div>
+              <h2 className="text-base font-bold text-zinc-950 tracking-tight">Tren Harga Satuan</h2>
+              <p className="text-[11px] font-medium text-zinc-500 mt-1 uppercase tracking-wide">
+                Harga per unit tiap transaksi — bukan rata-rata
+              </p>
+            </div>
+            <span className="text-[10px] font-bold px-3 py-1.5 rounded-full bg-zinc-950 text-white font-mono tracking-widest">
+              30 Transaksi Terakhir
+            </span>
           </div>
-          <span
-            className="text-xs px-2.5 py-1 rounded-lg mono-font"
-            style={{ background: 'var(--gold-muted)', color: 'var(--gold)', border: '1px solid rgba(212,170,60,0.2)' }}
-          >
-            30 transaksi terakhir
-          </span>
+          <div className="p-8 min-h-[400px]">
+            <IngredientPriceFluctuation
+              ingredients={ingredientOptions}
+              initialIngredientId={initialIngredientId}
+              initialData={initialPurchases}
+            />
+          </div>
         </div>
-        <div className="p-6 min-h-[380px] flex flex-col">
-          <IngredientPriceFluctuation
-            ingredients={ingredientOptions || []}
-            initialIngredientId={initialIngredientId}
-            initialData={initialPurchases || []}
-          />
-        </div>
-      </div>
+      )}
     </div>
   );
+}
+
+function cn(...inputs: any[]) {
+  return inputs.filter(Boolean).join(' ');
 }

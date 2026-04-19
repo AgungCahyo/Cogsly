@@ -12,200 +12,160 @@ import {
   Menu,
   X,
   BarChart3,
+  LogOut,
+  Calendar,
 } from 'lucide-react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '@/lib/cn';
+import { logout } from '@/app/login/actions';
+import { Profile, UserRole } from '@/types';
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
-
+/** Sidebar visibility — server enforcement lives in `lib/auth/access-policy.ts` (middleware + actions). */
 const navigation = [
-  { name: 'Dasbor', href: '/', icon: LayoutDashboard, description: 'Ringkasan bisnis' },
-  { name: 'Bahan Baku', href: '/ingredients', icon: Package, description: 'Stok & material' },
-  { name: 'Pembelian', href: '/procurement', icon: ShoppingCart, description: 'Log pengadaan' },
-  { name: 'Resep & HPP', href: '/recipes', icon: UtensilsCrossed, description: 'Harga pokok' },
-  { name: 'Kasir', href: '/pos', icon: ShoppingBag, description: 'Proses transaksi' },
-  { name: 'Rekap', href: '/recap', icon: BarChart3, description: 'Laporan performa' },
+  { name: 'Dasbor', href: '/', icon: LayoutDashboard, description: 'Ringkasan bisnis', roles: ['admin', 'warehouse', 'cashier'] },
+  { name: 'Reservasi', href: '/reservations', icon: Calendar, description: 'Booking meja', roles: ['admin', 'cashier', 'waiter'] },
+  { name: 'Bahan Baku', href: '/ingredients', icon: Package, description: 'Stok & material', roles: ['admin', 'warehouse'] },
+  { name: 'Pembelian', href: '/procurement', icon: ShoppingCart, description: 'Log pengadaan', roles: ['admin', 'warehouse'] },
+  { name: 'Resep & HPP', href: '/recipes', icon: UtensilsCrossed, description: 'Harga pokok', roles: ['admin'] },
+  { name: 'Kasir', href: '/pos', icon: ShoppingBag, description: 'Proses transaksi', roles: ['admin', 'cashier', 'waiter'] },
+  { name: 'Rekap', href: '/recap', icon: BarChart3, description: 'Laporan performa', roles: ['admin', 'cashier'] },
 ];
 
-export function LayoutShell({ children }: { children: React.ReactNode }) {
+export function LayoutShell({ children, profile }: { children: React.ReactNode; profile: Profile | null }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  if (pathname === '/login' || pathname === '/access-denied') {
+    return <>{children}</>;
+  }
+
+  const role = profile?.role || 'waiter';
+  const filteredNav = navigation.filter((item) => item.roles.includes(role));
+
+  const handleLogout = async () => {
+    await logout();
+  };
+
   return (
-    <div className="min-h-screen flex" style={{ background: 'var(--bg)' }}>
-      {/* Mobile overlay */}
+    <div className="min-h-screen flex bg-zinc-50 font-sans">
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 lg:hidden"
-          style={{ background: 'rgba(10,9,5,0.8)', backdropFilter: 'blur(4px)' }}
+          className="fixed inset-0 z-40 lg:hidden bg-zinc-950/20 backdrop-blur-sm"
           onClick={() => setSidebarOpen(false)}
+          aria-hidden
         />
       )}
 
-      {/* Sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-60 flex flex-col transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static',
+          'fixed inset-y-0 left-0 z-50 w-64 flex flex-col transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static',
+          'bg-white border-r border-zinc-200 shadow-sm print:hidden',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
-        style={{
-          background: 'var(--bg-card)',
-          borderRight: '1px solid var(--border)',
-        }}
       >
-        {/* Logo */}
-        <div
-          className="flex items-center justify-between h-16 px-5 shrink-0"
-          style={{ borderBottom: '1px solid var(--border)' }}
-        >
+        <div className="flex items-center justify-between h-20 px-6 shrink-0 border-b border-zinc-100">
           <div className="flex items-center gap-3">
-            <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center"
-              style={{
-                background: 'var(--gold)',
-                boxShadow: '0 0 20px rgba(212,170,60,0.3)',
-              }}
-            >
-              <span
-                className="font-bold text-sm leading-none"
-                style={{ color: '#0a0905', fontFamily: 'var(--font-serif)' }}
-              >
-                C
-              </span>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-zinc-950 text-white shadow-lg shadow-zinc-950/10">
+              <span className="font-serif font-bold text-lg leading-none">C</span>
             </div>
             <div>
-              <span
-                className="text-sm font-bold tracking-wide"
-                style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-serif)', letterSpacing: '0.05em' }}
-              >
-                COGSLY
-              </span>
-              <p className="text-xs" style={{ color: 'var(--text-muted)', marginTop: '-2px' }}>F&amp;B Manager</p>
+              <span className="text-sm font-bold tracking-widest font-serif text-zinc-950">COGSLY</span>
+              <p className="text-[10px] text-zinc-400 font-medium uppercase tracking-tighter">F&B Manager</p>
             </div>
           </div>
           <button
+            type="button"
             onClick={() => setSidebarOpen(false)}
-            className="lg:hidden p-1 rounded"
-            style={{ color: 'var(--text-muted)' }}
+            className="lg:hidden p-1.5 rounded-lg hover:bg-zinc-50 text-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950/25 focus-visible:ring-offset-2"
+            aria-label="Tutup menu"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Nav */}
-        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto" style={{ paddingTop: '1rem' }}>
-          <p
-            className="px-3 pb-2 text-xs font-semibold uppercase tracking-widest"
-            style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}
-          >
-            Menu Utama
-          </p>
-          {navigation.map((item) => {
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto" aria-label="Menu utama">
+          <p className="px-3 pb-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">Menu Utama</p>
+          {filteredNav.map((item) => {
             const isActive =
-              pathname === item.href ||
-              (item.href !== '/' && pathname.startsWith(item.href));
+              pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
 
             return (
               <Link
                 key={item.name}
                 href={item.href}
                 onClick={() => setSidebarOpen(false)}
+                aria-current={isActive ? 'page' : undefined}
                 className={cn(
-                  'group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 relative',
+                  'group flex items-center gap-3.5 px-3 py-3 rounded-xl transition-all duration-200 relative',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950/25 focus-visible:ring-offset-2',
+                  isActive
+                    ? 'bg-zinc-950 text-white shadow-md shadow-zinc-950/20'
+                    : 'text-zinc-500 hover:bg-zinc-50 hover:text-zinc-950'
                 )}
-                style={{
-                  background: isActive ? 'var(--gold-muted)' : 'transparent',
-                  color: isActive ? 'var(--gold)' : 'var(--text-secondary)',
-                }}
-                onMouseEnter={e => {
-                  if (!isActive) {
-                    (e.currentTarget as HTMLElement).style.background = 'var(--gold-glow)';
-                    (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)';
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (!isActive) {
-                    (e.currentTarget as HTMLElement).style.background = 'transparent';
-                    (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)';
-                  }
-                }}
               >
-                {isActive && (
-                  <span
-                    className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r-full"
-                    style={{ background: 'var(--gold)' }}
-                  />
-                )}
-
-                <item.icon className="w-4 h-4 shrink-0" style={{ color: isActive ? 'var(--gold)' : 'inherit' }} />
+                <div
+                  className={cn(
+                    'p-1.5 rounded-lg transition-colors',
+                    isActive ? 'bg-white/10' : 'bg-transparent group-hover:bg-zinc-100'
+                  )}
+                >
+                  <item.icon className="w-4 h-4 shrink-0" aria-hidden />
+                </div>
 
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium leading-none">{item.name}</p>
-                  <p className="text-xs mt-0.5 leading-none truncate" style={{ color: 'var(--text-muted)' }}>
-                    {item.description}
-                  </p>
+                  <p className="text-sm font-semibold">{item.name}</p>
+                  {!isActive && (
+                    <p className="text-[10px] text-zinc-400 font-medium truncate">{item.description}</p>
+                  )}
                 </div>
               </Link>
             );
           })}
         </nav>
 
-        {/* Footer */}
-        <div className="p-4 shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
-          <div
-            className="flex items-center gap-2.5 px-2 py-2 rounded-xl"
-            style={{ background: 'var(--gold-glow)' }}
-          >
-            <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0"
-              style={{ background: 'var(--gold-muted)', color: 'var(--gold)' }}
-            >
-              F
+        <div className="p-4 border-t border-zinc-100 bg-zinc-50/50 space-y-2">
+          <div className="flex items-center gap-3 px-3 py-3 rounded-2xl bg-white border border-zinc-200">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold bg-zinc-100 text-zinc-950 shadow-inner">
+              {profile?.full_name?.charAt(0) || role.charAt(0).toUpperCase()}
             </div>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold leading-none truncate" style={{ color: 'var(--text-primary)' }}>
-                F&amp;B Manager
-              </p>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Paket Gratis</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold text-zinc-950 truncate">{profile?.full_name || 'User'}</p>
+              <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{role}</p>
             </div>
-            <div
-              className="ml-auto w-1.5 h-1.5 rounded-full shrink-0 pulse-dot"
-              style={{ background: 'var(--success)' }}
-            />
           </div>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 transition-all font-bold text-[10px] uppercase tracking-widest focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30 focus-visible:ring-offset-2"
+          >
+            <LogOut className="w-4 h-4" aria-hidden />
+            Keluar Sistem
+          </button>
         </div>
       </aside>
 
-      {/* Main */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Mobile topbar */}
-        <header
-          className="lg:hidden flex items-center justify-between h-14 px-4 shrink-0"
-          style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)' }}
-        >
-          <div className="flex items-center gap-2.5">
-            <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center"
-              style={{ background: 'var(--gold)' }}
-            >
-              <span className="font-bold text-xs" style={{ color: '#0a0905', fontFamily: 'var(--font-serif)' }}>C</span>
+        <header className="lg:hidden flex items-center justify-between h-16 px-6 bg-white border-b border-zinc-200 shrink-0 print:hidden">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-zinc-950 text-white">
+              <span className="font-serif font-bold text-base">C</span>
             </div>
-            <span className="text-sm font-bold" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-serif)', letterSpacing: '0.05em' }}>
-              COGSLY
-            </span>
+            <span className="text-sm font-bold font-serif tracking-widest text-zinc-950">COGSLY</span>
           </div>
           <button
+            type="button"
             onClick={() => setSidebarOpen(true)}
-            className="p-2 rounded-lg transition-colors"
-            style={{ color: 'var(--text-secondary)', background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}
+            className="p-2.5 rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950/25 focus-visible:ring-offset-2"
+            aria-label="Buka menu"
           >
-            <Menu className="w-4 h-4" />
+            <Menu className="w-5 h-5" />
           </button>
         </header>
 
-        <main className="flex-1 overflow-y-auto relative z-10">{children}</main>
+        <main className="flex-1 overflow-y-auto relative z-10 scroll-smooth">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(0,0,0,0.02),transparent_40%)] pointer-events-none print:hidden" />
+          {children}
+        </main>
       </div>
     </div>
   );

@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { DM_Serif_Display, DM_Mono, Instrument_Sans } from "next/font/google";
 import "./globals.css";
 import { LayoutShell } from "@/components/LayoutShell";
+import { ToastProvider } from "@/components/ui/ToastProvider";
+import { createClient } from "@/lib/supabase/server";
+import { Profile } from "@/types";
 
 const dmSerif = DM_Serif_Display({
   subsets: ["latin"],
@@ -28,15 +31,30 @@ export const metadata: Metadata = {
   description: "Point of Sale & Manajemen Inventori Cerdas untuk Bisnis F&B",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  let profile: Profile | null = null;
+  if (user) {
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+    profile = data;
+  }
+
   return (
     <html lang="id" className="h-full">
       <body className={`${instrumentSans.variable} ${dmSerif.variable} ${dmMono.variable} min-h-full flex flex-col font-sans`}>
-        <LayoutShell>{children}</LayoutShell>
+        <ToastProvider>
+          <LayoutShell profile={profile}>{children}</LayoutShell>
+        </ToastProvider>
       </body>
     </html>
   );

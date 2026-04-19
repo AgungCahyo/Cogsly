@@ -1,5 +1,5 @@
-import { supabase } from '@/lib/supabase';
 import { NextResponse } from 'next/server';
+import { authorizeApiRequest } from '@/lib/auth/server-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,12 +15,15 @@ function getProjectRef(url: string | undefined) {
 }
 
 export async function GET() {
+  const auth = await authorizeApiRequest(['admin']);
+  if (!auth.ok) return auth.response;
+
   const project = getProjectRef(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
   const [ingredients, products, purchases] = await Promise.all([
-    supabase.from('ingredients').select('id', { count: 'exact', head: true }),
-    supabase.from('products').select('id', { count: 'exact', head: true }),
-    supabase.from('purchases').select('id', { count: 'exact', head: true }),
+    auth.supabase.from('ingredients').select('id', { count: 'exact', head: true }),
+    auth.supabase.from('products').select('id', { count: 'exact', head: true }),
+    auth.supabase.from('purchases').select('id', { count: 'exact', head: true }),
   ]);
 
   return NextResponse.json({

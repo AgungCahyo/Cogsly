@@ -1,100 +1,177 @@
 'use server';
 
-import { supabase } from '@/lib/supabase';
 import { revalidatePath } from 'next/cache';
+import { requireRoles } from '@/lib/auth/server-auth';
 
-import { SaleCartItem } from '@/types';
+export async function saveOrder(cart: any[], tableId: string, customerName: string) {
+  const { supabase } = await requireRoles(['admin', 'cashier', 'waiter']);
+  const { data: { user } } = await supabase.auth.getUser();
 
-export async function processSale(cart: SaleCartItem[]) {
   // 1. Calculate totals
-  let totalPrice = 0;
-  let totalHPP = 0;
-  
-  cart.forEach(item => {
-    totalPrice += (item.price * item.qty);
-    totalHPP += (item.hpp * item.qty);
-  });
+  const totalPrice = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+  const totalHPP = cart.reduce((sum, item) => sum + (item.hpp * item.qty), 0);
 
-  // 2. Insert Sale
-  const { data: saleData, error: saleError } = await supabase
-    .from('sales')
-    .insert([{ total_price: totalPrice, total_hpp: totalHPP }])
-    .select()
+  // 2. Check for existing pending order for this table
+  const { data: existingOrder } = await supabase
+    .from('orders')
+    .select('id')
+    .eq('table_id', tableId)
+    .eq('status', 'pending')
     .single();
 
-  if (saleError || !saleData) {
-    console.error("Sale insert error", saleError);
-    throw new Error("Failed to create sale record");
+  let orderId = existingOrder?.id;
+
+  if (!orderId) {
+    // Insert new order
+    const { data: newOrder, error: orderError } = await supabase
+      .from('orders')
+      .insert([{
+        table_id: tableId,
+        waiter_id: user?.id,
+        customer_name: customerName,
+        status: 'pending',
+        total_price: totalPrice,
+        total_hpp: totalHPP
+      }])
+      .select()
+      .single();
+
+    if (orderError) throw new Error("Gagal membuat pesanan: " + orderError.message);
+    orderId = newOrder.id;
+
+    // Update table status
+    await supabase.from('tables').update({ status: 'occupied' }).eq('id', tableId);
+  } else {
+    // Update existing order totals
+    await supabase.from('orders').update({
+      total_price: totalPrice,
+      total_hpp: totalHPP,
+      customer_name: customerName
+    }).eq('id', orderId);
+
+    // Delete existing items to replace (simple sync)
+    await supabase.from('order_items').delete().eq('order_id', orderId);
   }
 
-  // 3. Insert Sale Items
-  const saleItems = cart.map(item => ({
-    sale_id: saleData.id,
+  // 3. Insert items
+  const orderItems = cart.map(item => ({
+    order_id: orderId,
     product_id: item.id,
     quantity: item.qty,
     price: item.price,
     hpp: item.hpp
   }));
 
-  const { error: itemsError } = await supabase
-    .from('sale_items')
-    .insert(saleItems);
+  const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
+  if (itemsError) throw new Error("Gagal menyimpan detail pesanan");
 
-  if (itemsError) {
-    console.error("Sale items insert error", itemsError);
-    throw new Error("Failed to save sale items");
-  }
+  revalidatePath('/pos');
+  return orderId;
+}
 
-  // 4. Deduct Ingredients
-  // Group all ingredient needs
+export async function finalizePayment(orderId: string, paymentMethod: string) {
+  const { supabase } = await requireRoles(['admin', 'cashier']);
+
+  // 1. Get Order with Items and Recipes
+  const { data: order, error: orderError } = await supabase
+    .from('orders')
+    .select(`
+      *,
+      order_items (
+        *,
+        products (
+          recipe_items (
+            ingredient_id,
+            amount_required
+          )
+        )
+      )
+    `)
+    .eq('id', orderId)
+    .single();
+
+  if (orderError || !order) throw new Error("Pesanan tidak ditemukan");
+
+  // 2. Deduct Ingredients
   const ingredientMap: Record<string, number> = {};
-  
-  cart.forEach(item => {
-    item.recipe_items?.forEach((recipeItem) => {
-      const ingId = recipeItem.ingredient_id;
-      const amountNeeded = recipeItem.amount_required * item.qty;
-      if (ingredientMap[ingId]) {
-        ingredientMap[ingId] += amountNeeded;
-      } else {
-        ingredientMap[ingId] = amountNeeded;
-      }
+  order.order_items.forEach((item: any) => {
+    item.products?.recipe_items?.forEach((recipe: any) => {
+      const needed = recipe.amount_required * item.quantity;
+      ingredientMap[recipe.ingredient_id] = (ingredientMap[recipe.ingredient_id] || 0) + needed;
     });
   });
 
-  // Fetch current stock for these ingredients
-  const ingredientIds = Object.keys(ingredientMap);
-  if (ingredientIds.length > 0) {
-    const { data: currentIngredients } = await supabase
-      .from('ingredients')
-      .select('id, stock')
-      .in('id', ingredientIds);
-
-    if (currentIngredients) {
-      // Prepare updates
-      // In a real production app we'd want to use a stored procedure / RPC for atomic deduction.
-      // But standard updates are ok for this demo.
-      const updates = currentIngredients.map((ing: { id: string; stock: number | string | null }) => {
-        const needed = ingredientMap[ing.id] || 0;
-        const newStock = Number(ing.stock) - needed;
-        return {
-          id: ing.id,
-          stock: newStock
-        };
-      });
-
-      // Execute updates one by one (or upsert if setup properly)
-      for (const update of updates) {
-         await supabase
-           .from('ingredients')
-           .update({ stock: update.stock })
-           .eq('id', update.id);
-      }
+  for (const [ingId, amount] of Object.entries(ingredientMap)) {
+    const { data: ing } = await supabase.from('ingredients').select('stock').eq('id', ingId).single();
+    if (ing) {
+      const newStock = Number(ing.stock) - amount;
+      await supabase.from('ingredients').update({ stock: newStock }).eq('id', ingId);
     }
   }
 
+  // 3. Finalize Order
+  await supabase.from('orders').update({
+    status: 'paid',
+    payment_method: paymentMethod,
+    completed_at: new Date().toISOString()
+  }).eq('id', orderId);
+
+  // 4. Free Table
+  if (order.table_id) {
+    await supabase.from('tables').update({ status: 'available' }).eq('id', order.table_id);
+  }
+
   revalidatePath('/pos');
-  revalidatePath('/ingredients');
+  revalidatePath('/recap');
   revalidatePath('/');
-  
   return true;
+}
+
+export async function getRecentSales() {
+  const { supabase } = await requireRoles(['admin', 'cashier', 'waiter']);
+  const { data, error } = await supabase
+    .from('orders')
+    .select(`
+      *,
+      order_items (
+        *,
+        products (name)
+      )
+    `)
+    .eq('status', 'paid')
+    .order('completed_at', { ascending: false })
+    .limit(20);
+
+  return data || [];
+}
+
+export async function getOrderByTable(tableId: string) {
+  const { supabase } = await requireRoles(['admin', 'cashier', 'waiter']);
+  const { data, error } = await supabase
+    .from('orders')
+    .select(`
+      *,
+      order_items (
+        *,
+        products (
+          id, name, price, recipe_items (ingredient_id, amount_required)
+        )
+      )
+    `)
+    .eq('table_id', tableId)
+    .eq('status', 'pending')
+    .single();
+
+  if (error || !data) return null;
+
+  const cart = data.order_items.map((item: any) => ({
+    id: item.product_id,
+    name: item.products.name,
+    price: Number(item.price),
+    hpp: Number(item.hpp),
+    qty: Number(item.quantity),
+    recipe_items: item.products.recipe_items
+  }));
+
+  return { order: data, cart };
 }

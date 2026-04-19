@@ -1,12 +1,13 @@
-import { supabase } from '@/lib/supabase';
-import { ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
-import { notFound, redirect } from 'next/navigation';
-import { RecipeBuilderForm } from '../new/RecipeBuilderForm';
+import { createClient } from '@/lib/supabase/server';
+import { UtensilsCrossed } from 'lucide-react';
+import { notFound } from 'next/navigation';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { RecipeBuilderForm } from '@/components/recipes/RecipeBuilderForm';
+import { updateRecipe } from '@/lib/actions/recipes';
 
 export const dynamic = 'force-dynamic';
 
-import { IngredientOption, ProductRow, RecipeInput } from '@/types';
+import { IngredientOption, ProductRow, RecipeItemRow } from '@/types';
 
 export default async function EditRecipePage({
   params,
@@ -15,6 +16,7 @@ export default async function EditRecipePage({
 }) {
   const { id } = await params;
 
+  const supabase = await createClient();
   const { data: ingredients } = await supabase
     .from('ingredients')
     .select('id, name, unit, average_price, stock')
@@ -35,68 +37,27 @@ export default async function EditRecipePage({
     price: Number(product.price) || 0,
     operational_cost_buffer: Number(product.operational_cost_buffer) || 0,
     is_percentage_buffer: Boolean(product.is_percentage_buffer),
-    items: (product.recipe_items ?? []).map((i) => ({
+    items: (product.recipe_items ?? []).map((i: RecipeItemRow) => ({
       ingredient_id: i.ingredient_id || '',
       amount_required: Number(i.amount_required) || 0,
     })),
   };
 
-  async function submitRecipe(data: RecipeInput) {
-    'use server';
-
-    const name = (data.name ?? '').trim();
-    if (!name) throw new Error('Nama produk wajib diisi.');
-    if (!Number.isFinite(data.price) || data.price < 0) throw new Error('Harga harus angka non-negatif yang valid.');
-
-    const { error: productError } = await supabase
-      .from('products')
-      .update({
-        name,
-        price: data.price,
-        operational_cost_buffer: data.operational_cost_buffer,
-        is_percentage_buffer: data.is_percentage_buffer,
-      })
-      .eq('id', id);
-
-    if (productError) throw new Error(productError.message);
-
-    const { error: deleteError } = await supabase.from('recipe_items').delete().eq('product_id', id);
-    if (deleteError) throw new Error(deleteError.message);
-
-    const recipeItems = data.items.map((item) => ({
-      product_id: id,
-      ingredient_id: item.ingredient_id,
-      amount_required: item.amount_required,
-    }));
-
-    const { error: insertError } = await supabase.from('recipe_items').insert(recipeItems);
-    if (insertError) throw new Error(insertError.message);
-
-    redirect('/recipes');
-  }
+  const updateAction = updateRecipe.bind(null, id);
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-8">
-      <div className="flex items-center gap-4">
-        <Link href="/recipes" className="btn-ghost" style={{ padding: '0.5rem', borderRadius: '10px' }}>
-          <ArrowLeft style={{ width: '18px', height: '18px' }} />
-        </Link>
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--gold)', fontFamily: 'var(--font-mono)' }}>
-            ◆ Resep & HPP
-          </p>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-serif)' }}>
-            Edit Resep
-          </h1>
-          <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-            Update komposisi bahan dan perhitungan HPP
-          </p>
-        </div>
-      </div>
+    <div className="p-6 lg:p-10 max-w-7xl mx-auto space-y-10">
+      <PageHeader
+        eyebrow="◆ Resep & HPP"
+        title="Edit Resep Produk"
+        description="Update komposisi bahan dan penyesuaian perhitungan biaya"
+        backHref="/recipes"
+        icon={<UtensilsCrossed className="h-6 w-6" aria-hidden />}
+      />
 
       <RecipeBuilderForm
         ingredients={ingredients || []}
-        submitRecipe={submitRecipe}
+        submitRecipe={updateAction}
         initialRecipe={initialRecipe}
       />
     </div>
