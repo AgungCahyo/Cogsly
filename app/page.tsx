@@ -345,7 +345,7 @@ export default async function Dashboard(props: {
   return (
     <div className="p-6 lg:p-10 max-w-7xl mx-auto space-y-10">
       {/* Header */}
-      <div className="flex items-end justify-between border-b border-zinc-200 pb-8">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-zinc-200 pb-8">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 mb-2 font-mono">
             ◆ Dasbor Utama
@@ -357,7 +357,7 @@ export default async function Dashboard(props: {
             Pusat kendali, analisa performa, dan kesehatan inventori secara real-time.
           </p>
         </div>
-        <div className="hidden sm:flex items-center gap-2.5 text-[10px] font-bold uppercase tracking-widest px-4 py-2.5 rounded-full bg-zinc-100 text-zinc-600 border border-zinc-200">
+        <div className="inline-flex w-fit items-center gap-2.5 text-[10px] font-bold uppercase tracking-widest px-4 py-2.5 rounded-full bg-zinc-100 text-zinc-600 border border-zinc-200">
           <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-pulse" />
           <Activity className="w-3.5 h-3.5" />
           Data Langsung
@@ -365,8 +365,15 @@ export default async function Dashboard(props: {
       </div>
 
       {/* Quick actions */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {(
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold text-zinc-950 tracking-tight">Aksi Cepat</h2>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+            Sesuai role akun
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {(
           [
             {
               label: 'Tambah Bahan',
@@ -375,9 +382,15 @@ export default async function Dashboard(props: {
               roles: ['admin', 'warehouse'] as const,
             },
             {
-              label: 'Catat Pembelian',
+              label: 'Catat Stok',
               href: '/procurement/new',
-              desc: 'Log pengadaan material',
+              desc: 'Stok masuk supplier',
+              roles: ['admin', 'warehouse'] as const,
+            },
+            {
+              label: 'Produksi Internal',
+              href: '/procurement/internal',
+              desc: 'Ubah komponen jadi bahan',
               roles: ['admin', 'warehouse'] as const,
             },
             {
@@ -393,23 +406,24 @@ export default async function Dashboard(props: {
               roles: ['admin', 'cashier', 'waiter'] as const,
             },
           ] as const
-        )
-          .filter((item) => (item.roles as readonly UserRole[]).includes(role))
-          .map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="group p-3 bg-white border border-zinc-200 rounded-2xl transition-all hover:border-zinc-950 hover:bg-zinc-950 hover:text-white"
-            >
-              <div className="flex items-center justify-between mb-1.5">
-                <p className="text-sm font-bold tracking-tight">{item.label}</p>
-                <ChevronRight className="w-4 h-4 text-zinc-300 group-hover:text-white transition-transform group-hover:translate-x-1" />
-              </div>
-              <p className="text-[10px] font-medium text-zinc-400 group-hover:text-zinc-300 transition-colors uppercase tracking-widest">
-                {item.desc}
-              </p>
-            </Link>
-          ))}
+          )
+            .filter((item) => (item.roles as readonly UserRole[]).includes(role))
+            .map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="group p-3 bg-white border border-zinc-200 rounded-2xl transition-all hover:border-zinc-950 hover:bg-zinc-950 hover:text-white"
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-sm font-bold tracking-tight">{item.label}</p>
+                  <ChevronRight className="w-4 h-4 text-zinc-300 group-hover:text-white transition-transform group-hover:translate-x-1" />
+                </div>
+                <p className="text-[10px] font-medium text-zinc-400 group-hover:text-zinc-300 transition-colors uppercase tracking-widest">
+                  {item.desc}
+                </p>
+              </Link>
+            ))}
+        </div>
       </div>
 
       {/* Financial Recap Section (Admin Only) */}
@@ -453,6 +467,24 @@ export default async function Dashboard(props: {
         </div>
       </div>
 
+      {canInventory && lowStockCount > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 py-4 bg-zinc-950 text-white rounded-2xl">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+            <p className="text-xs font-semibold leading-relaxed">
+              Ada {lowStockCount} bahan menipis. Prioritaskan restock untuk menghindari stok habis saat operasional.
+            </p>
+          </div>
+          <Link
+            href="/ingredients"
+            className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-zinc-950 bg-white px-3 py-2 rounded-xl"
+          >
+            Lihat Inventori
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+      )}
+
       {/* Purchase Trend Chart Section */}
       {canSeePurchaseTrend && (
         <div className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm shadow-zinc-950/5">
@@ -467,13 +499,32 @@ export default async function Dashboard(props: {
               30 Transaksi Terakhir
             </span>
           </div>
-          <div className="p-8 min-h-[400px]">
-            <IngredientPriceFluctuation
-              ingredients={ingredientOptions}
-              initialIngredientId={initialIngredientId}
-              initialData={initialPurchases}
-            />
-          </div>
+          {ingredientOptions.length === 0 ? (
+            <div className="p-8 min-h-[260px] flex items-center justify-center">
+              <div className="text-center max-w-md">
+                <p className="text-sm font-bold text-zinc-950">Belum ada data bahan untuk ditampilkan</p>
+                <p className="text-xs text-zinc-500 mt-1.5">
+                  Tambahkan bahan dan catat stok masuk terlebih dulu agar tren harga bisa dianalisis.
+                </p>
+                {(role === 'admin' || role === 'warehouse') && (
+                  <Link
+                    href="/ingredients/new"
+                    className="inline-flex mt-4 items-center gap-2 px-4 py-2 rounded-xl bg-zinc-950 text-white text-[10px] font-bold uppercase tracking-widest"
+                  >
+                    Tambah Bahan
+                  </Link>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="p-8 min-h-[400px]">
+              <IngredientPriceFluctuation
+                ingredients={ingredientOptions}
+                initialIngredientId={initialIngredientId}
+                initialData={initialPurchases}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

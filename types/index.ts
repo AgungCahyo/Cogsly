@@ -125,6 +125,9 @@ export type ChartMode = 'revenue' | 'cashflow';
 export interface POSRecipeItem {
   ingredient_id: string;
   amount_required: number;
+  ingredient_name?: string;
+  ingredient_unit?: string | null;
+  ingredient_stock?: number;
 }
 
 export interface POSProduct {

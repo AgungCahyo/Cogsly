@@ -11,7 +11,7 @@ export default async function POSPage() {
   // Fetch Products
   const { data: products } = await supabase
     .from('products')
-    .select(`id, name, price, operational_cost_buffer, is_percentage_buffer, recipe_items(ingredient_id, amount_required, ingredients(average_price))`)
+    .select(`id, name, price, operational_cost_buffer, is_percentage_buffer, recipe_items(ingredient_id, amount_required, ingredients(name, unit, average_price, stock))`)
     .returns<ProductRow[]>()
     .order('name');
 
@@ -29,6 +29,9 @@ export default async function POSPage() {
     const recipe_items = (p.recipe_items ?? []).map((item) => ({
       ingredient_id: item.ingredient_id || '',
       amount_required: Number(item.amount_required) || 0,
+      ingredient_name: item.ingredients?.name ?? 'Bahan',
+      ingredient_unit: item.ingredients?.unit ?? null,
+      ingredient_stock: Number(item.ingredients?.stock) || 0,
     }));
     const rawHPP = (p.recipe_items ?? []).reduce((sum, item) => {
       return sum + (Number(item.amount_required) || 0) * Number(item.ingredients?.average_price || 0);

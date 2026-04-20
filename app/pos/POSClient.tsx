@@ -53,6 +53,25 @@ export function POSClient({
   const [voidReason, setVoidReason] = useState('');
   const [voidLoading, setVoidLoading] = useState(false);
 
+  const getStockBlockingReason = (product: POSProduct, targetQty: number) => {
+    const recipeItems = product.recipe_items ?? [];
+    for (const recipeItem of recipeItems) {
+      const perPortion = Number(recipeItem.amount_required) || 0;
+      if (perPortion <= 0) continue;
+
+      const available = Number(recipeItem.ingredient_stock);
+      if (!Number.isFinite(available)) continue;
+
+      const needed = perPortion * targetQty;
+      if (needed > available) {
+        const ingredientName = recipeItem.ingredient_name ?? 'Bahan';
+        const unit = recipeItem.ingredient_unit ?? '';
+        return `${ingredientName} (butuh ${needed.toLocaleString('id-ID')}${unit ? ` ${unit}` : ''}, stok ${available.toLocaleString('id-ID')}${unit ? ` ${unit}` : ''})`;
+      }
+    }
+    return null;
+  };
+
   const selectTable = async (table: Table) => {
     setLoading(true);
     setSelectedTable(table);
@@ -73,6 +92,14 @@ export function POSClient({
   };
 
   const addToCart = (product: POSProduct) => {
+    const currentQty = cart.find((item) => item.id === product.id)?.qty ?? 0;
+    const nextQty = currentQty + 1;
+    const stockBlockReason = getStockBlockingReason(product, nextQty);
+    if (stockBlockReason) {
+      showToast(`Stok bahan tidak cukup untuk ${product.name}: ${stockBlockReason}`, 'error');
+      return;
+    }
+
     setCart((prev) => {
       const existing = prev.find((item) => item.id === product.id);
       if (existing) {
@@ -85,6 +112,17 @@ export function POSClient({
   };
 
   const updateQty = (id: string, delta: number) => {
+    if (delta > 0) {
+      const item = cart.find((cartItem) => cartItem.id === id);
+      if (item) {
+        const stockBlockReason = getStockBlockingReason(item, item.qty + delta);
+        if (stockBlockReason) {
+          showToast(`Stok bahan tidak cukup untuk ${item.name}: ${stockBlockReason}`, 'error');
+          return;
+        }
+      }
+    }
+
     setCart((prev) =>
       prev
         .map((item) => {
@@ -335,15 +373,19 @@ export function POSClient({
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in slide-in-from-right-4 duration-500">
               {products.map((product) => {
                 const inCart = cart.find((c) => c.id === product.id);
+                const isOutOfStock = Boolean(getStockBlockingReason(product, 1));
+                const addMoreBlockedReason = getStockBlockingReason(product, (inCart?.qty ?? 0) + 1);
                 return (
                   <button
                     key={product.id}
                     onClick={() => addToCart(product)}
+                    disabled={isOutOfStock}
                     className={cn(
-                      'group relative text-left bg-white rounded-[2rem] p-6 border transition-all duration-300 flex flex-col gap-5',
+                      'group relative text-left bg-white rounded-[2rem] p-6 border transition-all duration-300 flex flex-col gap-5 disabled:cursor-not-allowed',
                       inCart
                         ? 'border-zinc-950 ring-2 ring-zinc-950 shadow-xl'
-                        : 'border-zinc-100 hover:border-zinc-950'
+                        : 'border-zinc-100 hover:border-zinc-950',
+                      isOutOfStock && 'opacity-50 border-zinc-200 bg-zinc-50 hover:border-zinc-200'
                     )}
                   >
                     {inCart && (
@@ -359,6 +401,15 @@ export function POSClient({
                       <p className="text-xs font-bold text-zinc-400 font-mono">
                         Rp {product.price.toLocaleString()}
                       </p>
+                      {isOutOfStock ? (
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-red-500 mt-1.5">
+                          Bahan kurang / habis
+                        </p>
+                      ) : addMoreBlockedReason && inCart ? (
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-amber-500 mt-1.5">
+                          Batas stok tercapai
+                        </p>
+                      ) : null}
                     </div>
                   </button>
                 );
@@ -455,7 +506,8 @@ export function POSClient({
                       <span className="text-xs font-bold w-6 text-center">{item.qty}</span>
                       <button
                         onClick={() => updateQty(item.id, 1)}
-                        className="w-7 h-7 bg-white rounded-lg flex items-center justify-center border border-zinc-100"
+                        disabled={Boolean(getStockBlockingReason(item, item.qty + 1))}
+                        className="w-7 h-7 bg-white rounded-lg flex items-center justify-center border border-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <Plus className="w-3" />
                       </button>

@@ -15,6 +15,7 @@ export function ProcurementForm({
   ingredients: IngredientOption[];
   onSubmit: (formData: FormData) => Promise<void>;
 }) {
+  const [stockSource, setStockSource] = useState<'purchase' | 'internal'>('purchase');
   const [selectedIngredient, setSelectedIngredient] = useState<IngredientOption | null>(null);
   const [quantity, setQuantity] = useState<number>(0);
   const [purchaseUnit, setPurchaseUnit] = useState('');
@@ -43,6 +44,37 @@ export function ProcurementForm({
 
   return (
     <form action={onSubmit} className="space-y-8">
+      {/* Stock Source */}
+      <div className="space-y-2">
+        <label className="block text-xs font-bold uppercase tracking-widest text-zinc-400">
+          Sumber Stok
+        </label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <label className="flex items-center gap-3 p-4 rounded-2xl border border-zinc-200 bg-zinc-50 cursor-pointer has-checked:border-zinc-950 has-checked:bg-zinc-950 has-checked:text-white transition-all">
+            <input
+              type="radio"
+              name="stock_source"
+              value="purchase"
+              checked={stockSource === 'purchase'}
+              onChange={() => setStockSource('purchase')}
+              className="sr-only"
+            />
+            <span className="text-[10px] font-bold uppercase tracking-widest">Pembelian Supplier</span>
+          </label>
+          <label className="flex items-center gap-3 p-4 rounded-2xl border border-zinc-200 bg-zinc-50 cursor-pointer has-checked:border-zinc-950 has-checked:bg-zinc-950 has-checked:text-white transition-all">
+            <input
+              type="radio"
+              name="stock_source"
+              value="internal"
+              checked={stockSource === 'internal'}
+              onChange={() => setStockSource('internal')}
+              className="sr-only"
+            />
+            <span className="text-[10px] font-bold uppercase tracking-widest">Produksi Internal</span>
+          </label>
+        </div>
+      </div>
+
       {/* Ingredient Selection */}
       <Select
         label="Pilih Bahan Baku"
@@ -54,18 +86,27 @@ export function ProcurementForm({
         required
       />
 
-      {/* Supplier */}
+      {/* Supplier / Source Detail */}
       <div className="space-y-2">
         <label className="block text-xs font-bold uppercase tracking-widest text-zinc-400">
-          Pemasok / Toko
+          {stockSource === 'internal' ? 'Keterangan Produksi' : 'Pemasok / Toko'}
         </label>
         <input
           type="text"
           name="supplier"
-          required
-          placeholder="cth. Toko Makmur, Pasar Induk"
+          required={stockSource === 'purchase'}
+          placeholder={
+            stockSource === 'internal'
+              ? 'cth. Dapur Produksi Shift Pagi'
+              : 'cth. Toko Makmur, Pasar Induk'
+          }
           className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl px-5 py-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-zinc-950/5 focus:border-zinc-950 transition-all placeholder:text-zinc-200"
         />
+        {stockSource === 'internal' && (
+          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-300">
+            Kosongkan jika tidak perlu detail tambahan.
+          </p>
+        )}
       </div>
 
       {/* Quantity & Units */}
@@ -176,7 +217,7 @@ export function ProcurementForm({
       {/* Total Price */}
       <div className="space-y-2">
         <label className="block text-xs font-bold uppercase tracking-widest text-zinc-400">
-          Total Pembayaran (IDR)
+          {stockSource === 'internal' ? 'Total Biaya Produksi (IDR)' : 'Total Pembayaran (IDR)'}
         </label>
         <div className="relative group">
           <span className="absolute left-5 top-1/2 -translate-y-1/2 text-sm font-bold text-zinc-300 group-focus-within:text-zinc-950 transition-colors">

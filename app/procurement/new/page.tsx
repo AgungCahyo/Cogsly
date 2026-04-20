@@ -19,7 +19,7 @@ export default async function AddPurchasePage() {
     <div className="p-6 lg:p-10 max-w-2xl mx-auto space-y-10">
       <PageHeader
         eyebrow="◆ Pengadaan"
-        title="Catat Pembelian"
+        title="Catat Stok Masuk"
         backHref="/procurement"
         icon={<PackagePlus className="h-6 w-6" aria-hidden />}
       />

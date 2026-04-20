@@ -56,6 +56,9 @@ export async function saveOrder(cart: any[], tableId: string, customerName: stri
       .single();
 
     if (orderError || !newOrder) {
+      if (orderError?.message?.toLowerCase().includes('duplicate') || orderError?.message?.toLowerCase().includes('unique')) {
+        throw new Error('Meja ini sedang diproses pengguna lain. Coba refresh lalu ulangi.');
+      }
       throw new Error('Gagal membuat pesanan: ' + (orderError?.message ?? 'Unknown error'));
     }
 
@@ -114,6 +117,8 @@ export async function saveOrder(cart: any[], tableId: string, customerName: stri
 
 export async function finalizePayment(orderId: string, paymentMethod: string) {
   const { supabase } = await requireRoles(['admin', 'cashier']);
+  const { data: { user } } = await supabase.auth.getUser();
+  const paymentRequestId = crypto.randomUUID();
 
   const { data: rawOrder, error: orderError } = await supabase
     .from('orders')
@@ -174,6 +179,21 @@ export async function finalizePayment(orderId: string, paymentMethod: string) {
     );
   }
 
+  const restoreDeductedStocks = async () => {
+    for (const [ingId, amount] of Object.entries(ingredientDeductions)) {
+      const { data: ing } = await supabase
+        .from('ingredients')
+        .select('stock')
+        .eq('id', ingId)
+        .single();
+      if (!ing) continue;
+      await supabase
+        .from('ingredients')
+        .update({ stock: Number(ing.stock) + amount })
+        .eq('id', ingId);
+    }
+  };
+
   // Deduct stock atomically via RPC
   for (const [ingId, amount] of Object.entries(ingredientDeductions)) {
     const { error: rpcError } = await supabase.rpc('deduct_ingredient_stock', {
@@ -198,17 +218,39 @@ export async function finalizePayment(orderId: string, paymentMethod: string) {
   }
 
   // Mark as paid — idempotency guard
-  const { error: orderUpdateError } = await supabase
+  let { error: orderUpdateError } = await supabase
     .from('orders')
     .update({
       status: 'paid',
       payment_method: paymentMethod,
       completed_at: new Date().toISOString(),
+      paid_by: user?.id ?? null,
+      payment_request_id: paymentRequestId,
     })
     .eq('id', orderId)
     .eq('status', 'pending');
 
+  if (
+    orderUpdateError &&
+    orderUpdateError.message.toLowerCase().includes('column') &&
+    (orderUpdateError.message.includes('paid_by') ||
+      orderUpdateError.message.includes('payment_request_id'))
+  ) {
+    const fallbackUpdate = await supabase
+      .from('orders')
+      .update({
+        status: 'paid',
+        payment_method: paymentMethod,
+        completed_at: new Date().toISOString(),
+      })
+      .eq('id', orderId)
+      .eq('status', 'pending');
+    orderUpdateError = fallbackUpdate.error;
+  }
+
   if (orderUpdateError) {
+    // Best-effort compensation: restore deducted stock if order status update fails.
+    await restoreDeductedStocks();
     throw new Error('Gagal menyelesaikan pembayaran: ' + orderUpdateError.message);
   }
 
@@ -225,6 +267,7 @@ export async function finalizePayment(orderId: string, paymentMethod: string) {
 // ── Void/cancel a pending order ──────────────────────────────────────────────
 export async function voidOrder(orderId: string, reason: string) {
   const { supabase } = await requireRoles(['admin', 'cashier']);
+  const { data: { user } } = await supabase.auth.getUser();
 
   const { data: order, error: fetchError } = await supabase
     .from('orders')
@@ -238,15 +281,33 @@ export async function voidOrder(orderId: string, reason: string) {
 
   if (!reason?.trim()) throw new Error('Alasan pembatalan wajib diisi.');
 
-  const { error: voidError } = await supabase
+  let { error: voidError } = await supabase
     .from('orders')
     .update({
       status: 'cancelled',
       void_reason: reason.trim(),
       void_at: new Date().toISOString(),
+      void_by: user?.id ?? null,
     })
     .eq('id', orderId)
     .eq('status', 'pending');
+
+  if (
+    voidError &&
+    voidError.message.toLowerCase().includes('column') &&
+    voidError.message.includes('void_by')
+  ) {
+    const fallbackVoid = await supabase
+      .from('orders')
+      .update({
+        status: 'cancelled',
+        void_reason: reason.trim(),
+        void_at: new Date().toISOString(),
+      })
+      .eq('id', orderId)
+      .eq('status', 'pending');
+    voidError = fallbackVoid.error;
+  }
 
   if (voidError) throw new Error('Gagal membatalkan pesanan: ' + voidError.message);
 

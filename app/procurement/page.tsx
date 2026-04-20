@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { ShoppingCart, Plus, FileText, Calendar, ArrowRight } from 'lucide-react';
+import { ShoppingCart, Plus, FileText, Calendar, ArrowRight, FlaskConical } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
@@ -28,19 +28,28 @@ export default async function ProcurementPage() {
             ◆ Pengadaan
           </p>
           <h1 className="text-4xl font-bold tracking-tight text-zinc-950 font-serif">
-            Log Pembelian
+            Log Stok Masuk
           </h1>
           <p className="text-sm mt-1.5 text-zinc-500 font-medium tracking-tight">
             Pelacakan pengadaan material dan riwayat transaksi inventori
           </p>
         </div>
-        <Link 
-          href="/procurement/new" 
-          className="inline-flex items-center gap-2.5 bg-zinc-950 text-white px-6 py-3 rounded-2xl font-bold text-sm transition-all hover:bg-zinc-800 hover:shadow-xl hover:shadow-zinc-950/10"
-        >
-          <Plus className="w-4 h-4" />
-          Catat Pembelian
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/procurement/internal"
+            className="inline-flex items-center gap-2.5 bg-white border border-zinc-200 text-zinc-950 px-6 py-3 rounded-2xl font-bold text-sm transition-all hover:bg-zinc-50 hover:border-zinc-300"
+          >
+            <FlaskConical className="w-4 h-4" />
+            Produksi Internal
+          </Link>
+          <Link
+            href="/procurement/new"
+            className="inline-flex items-center gap-2.5 bg-zinc-950 text-white px-6 py-3 rounded-2xl font-bold text-sm transition-all hover:bg-zinc-800 hover:shadow-xl hover:shadow-zinc-950/10"
+          >
+            <Plus className="w-4 h-4" />
+            Catat Stok
+          </Link>
+        </div>
       </div>
 
       {/* Summary strips */}
@@ -121,9 +130,15 @@ export default async function ProcurementPage() {
                       </td>
                       <td className="px-8 py-6">
                         <p className="font-bold text-sm text-zinc-950">{log.ingredients?.name}</p>
-                        <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-1">
-                          Supplier: {log.supplier ?? '—'}
-                        </p>
+                        {log.supplier === 'Produksi Internal' ? (
+                          <p className="text-[10px] font-bold uppercase tracking-widest mt-1 text-zinc-950">
+                            Sumber: Produksi Internal
+                          </p>
+                        ) : (
+                          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-1">
+                            Supplier: {log.supplier ?? '—'}
+                          </p>
+                        )}
                       </td>
                       <td className="px-8 py-6">
                         <div className="flex items-baseline gap-1.5">
