@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { PackagePlus, AlertTriangle, Pencil, Package } from 'lucide-react';
 import Link from 'next/link';
 import { ErrorBoundary, TableSkeleton } from '@/components/ui/ErrorBoundary';
+import { CsvImportButton } from '@/components/ingredients/CsvImportButton';
 import { Ingredient } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -219,21 +220,24 @@ export default function IngredientsPage() {
             Kelola material dan pantau level stok secara real-time
           </p>
         </div>
-        <div className='flex gap-8'>
+        <div className='flex gap-4 flex-wrap justify-end'>
+        <CsvImportButton />
 
         <Link
           href="/ingredients/new"
-          className="inline-flex items-center gap-2.5 bg-zinc-950 text-white px-6 py-3 rounded-2xl font-bold text-sm transition-all hover:bg-zinc-800 hover:shadow-xl hover:shadow-zinc-950/10"
+          className="inline-flex items-center gap-2.5 bg-zinc-950 text-white px-5 sm:px-6 py-3 rounded-2xl font-bold text-sm transition-all hover:bg-zinc-800 hover:shadow-xl hover:shadow-zinc-950/10"
           >
           <PackagePlus className="w-4 h-4" />
-          Tambah Bahan
+          <span className="hidden sm:inline">Tambah Bahan</span>
+          <span className="sm:hidden">Tambah</span>
         </Link>
         <Link
           href="/ingredients/waste"
-          className="inline-flex items-center gap-2.5 bg-zinc-950 text-white px-6 py-3 rounded-2xl font-bold text-sm transition-all hover:bg-zinc-800 hover:shadow-xl hover:shadow-zinc-950/10"
+          className="inline-flex items-center gap-2.5 bg-white border border-zinc-200 text-zinc-950 px-5 sm:px-6 py-3 rounded-2xl font-bold text-sm transition-all hover:bg-zinc-50 hover:border-zinc-300"
           >
-          <PackagePlus className="w-4 h-4" />
-          Laporan Waste
+          <PackagePlus className="w-4 h-4 text-zinc-500" />
+          <span className="hidden sm:inline">Laporan Waste</span>
+          <span className="sm:hidden">Waste</span>
         </Link>
           </div>
       </div>

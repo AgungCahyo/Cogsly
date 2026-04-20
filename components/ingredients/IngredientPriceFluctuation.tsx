@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { PriceChart } from './PriceChart';
 import { TrendingUp, Activity, Search } from 'lucide-react';
+import { getPurchaseTrends } from './actions';
 import { Select } from '@/components/ui/Select';
 
 import { IngredientOption, PurchasePoint } from '@/types';
@@ -41,9 +42,8 @@ export function IngredientPriceFluctuation({
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`/api/purchases?ingredient_id=${encodeURIComponent(ingredientId)}`, { cache: 'no-store' });
-        const json: { data?: PurchasePoint[]; error?: string } = await res.json();
-        if (!res.ok) throw new Error(json.error || 'Gagal memuat data pembelian');
+        const json = await getPurchaseTrends(ingredientId);
+        if (json.error) throw new Error(json.error);
         if (!cancelled) setData(json.data ?? []);
       } catch (e: unknown) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));

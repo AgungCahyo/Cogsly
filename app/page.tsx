@@ -338,6 +338,7 @@ export default async function Dashboard(props: {
       customStartDate: customStartStr,
       customEndDate: customEndStr,
       basePath: '/',
+      hideHeader: true,
     };
   }
 

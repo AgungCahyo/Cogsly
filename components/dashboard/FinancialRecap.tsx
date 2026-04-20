@@ -2,13 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie,
-} from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, } from 'recharts';
 import { format, parseISO } from 'date-fns';
 import { id } from 'date-fns/locale';
-import { TrendingUp, TrendingDown, ShoppingBag, DollarSign, Package, BarChart3, Calendar, Star, ArrowDownLeft, ArrowUpRight, Wallet, ShoppingCart, Printer, CreditCard, QrCode, Banknote, PieChart as PieIcon
-} from 'lucide-react';
-
+import { TrendingUp, DollarSign, Package, BarChart3, Calendar, Star, ArrowDownLeft, ArrowUpRight, Wallet, PieChart as PieIcon } from 'lucide-react';
 import { PeriodStats, ChartPoint, TopProduct, ExpenseCategory, RecapTab as Tab, ChartMode } from '@/types';
 
 type Props = {
@@ -24,6 +21,7 @@ type Props = {
   customStartDate?: string;
   customEndDate?: string;
   basePath?: string;
+  hideHeader?: boolean;
 };
 
 function formatRupiah(n: number) {
@@ -149,7 +147,8 @@ export function FinancialRecap({
   initialTab = 'daily',
   customStartDate,
   customEndDate,
-  basePath = '/recap'
+  basePath = '/recap',
+  hideHeader = false
 }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>(initialTab);
@@ -201,18 +200,20 @@ export function FinancialRecap({
   return (
     <div className="p-6 lg:p-10 max-w-7xl mx-auto space-y-10 print:p-0 print:space-y-6 print:max-w-none print:w-full">
       {/* Header */}
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-8 border-b border-zinc-200 pb-10 print:pb-6">
-        <div className="flex-1">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 mb-2 font-mono">
-            ◆ Restaurant Intelligence
-          </p>
-          <h1 className="text-4xl font-bold tracking-tight text-zinc-950 font-serif print:text-2xl">
-            Financial Dashboard
-          </h1>
-          <p className="text-sm mt-1.5 text-zinc-500 font-medium">
-            Periode: <span className="text-zinc-950">{tab === 'daily' ? 'Hari Ini' : tab === 'weekly' ? 'Minggu Ini' : tab === 'monthly' ? 'Bulan Ini' : 'Khusus'}</span>
-          </p>
-        </div>
+      <div className={cn("flex flex-col lg:flex-row items-start lg:items-center gap-8 border-b border-zinc-200 pb-10 print:pb-6", hideHeader ? "justify-end" : "justify-between")}>
+        {!hideHeader && (
+          <div className="flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 mb-2 font-mono">
+              ◆ Restaurant Intelligence
+            </p>
+            <h1 className="text-4xl font-bold tracking-tight text-zinc-950 font-serif print:text-2xl">
+              Financial Dashboard
+            </h1>
+            <p className="text-sm mt-1.5 text-zinc-500 font-medium">
+              Periode: <span className="text-zinc-950">{tab === 'daily' ? 'Hari Ini' : tab === 'weekly' ? 'Minggu Ini' : tab === 'monthly' ? 'Bulan Ini' : 'Khusus'}</span>
+            </p>
+          </div>
+        )}
 
         <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4 w-full lg:w-auto z-50">
           <div className="relative">

@@ -3,7 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { routeAccessPolicy, effectiveRole, isAccessAllowed } from '@/lib/auth/access-policy';
 import type { UserRole } from '@/types';
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Create a response to mutate cookies
