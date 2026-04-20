@@ -65,13 +65,13 @@ export default function ReservationsPage() {
     <div className="p-10 space-y-10 max-w-7xl mx-auto animate-in fade-in duration-700">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 mb-1 font-mono">◆ Booking Meja</p>
-          <h1 className="text-4xl font-bold font-serif tracking-tight text-zinc-950">Management Reservasi</h1>
+          <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-zinc-400 mb-1 font-mono">◆ Booking Meja</p>
+          <h1 className="text-2xl font-bold font-serif tracking-tight text-zinc-950">Management Reservasi</h1>
         </div>
         <button
           type="button"
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-3 px-8 py-4 bg-zinc-950 text-white rounded-3xl font-bold text-xs uppercase tracking-widest hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-950/20 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950/25 focus-visible:ring-offset-2"
+          className="flex items-center gap-3 px-4 py-2 bg-zinc-950 text-white rounded-3xl font-medium text-xs uppercase tracking-widest hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-950/20 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950/25 focus-visible:ring-offset-2"
         >
           <Plus className="w-5 h-5" />
           Tambah Reservasi

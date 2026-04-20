@@ -1,15 +1,20 @@
 import { createClient } from '@/lib/supabase/server';
 import { Wallet, TrendingUp, PackageSearch, AlertTriangle, Activity, ArrowUpRight, ChevronRight } from "lucide-react";
 import { IngredientPriceFluctuation } from '@/components/ingredients/IngredientPriceFluctuation';
+import { FinancialRecap } from '@/components/dashboard/FinancialRecap';
 import Link from 'next/link';
 import { effectiveRole } from '@/lib/auth/access-policy';
 
 export const dynamic = 'force-dynamic';
 
-import { IngredientOption, ProductRow, PurchasePoint, Ingredient, UserRole } from '@/types';
+import { IngredientOption, ProductRow, PurchasePoint, Ingredient, UserRole, PurchaseRow } from '@/types';
 
-export default async function Dashboard() {
+export default async function Dashboard(props: {
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const supabase = await createClient();
+  const searchParams = await props.searchParams;
+  
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -21,11 +26,19 @@ export default async function Dashboard() {
   const canInventory = role === 'admin' || role === 'warehouse';
   const canRecipes = role === 'admin';
   const canSeePurchaseTrend = role === 'admin' || role === 'warehouse' || role === 'cashier';
+  const isAdmin = role === 'admin';
 
-  const { data: ingredients } = await supabase
-    .from('ingredients')
-    .select('id, name, stock, low_stock_threshold, average_price')
-    .returns<Ingredient[]>();
+  // 1. Operational Stats Fetching
+  const [{ data: ingredients }, { data: products }] = await Promise.all([
+    supabase
+      .from('ingredients')
+      .select('id, name, stock, low_stock_threshold, average_price')
+      .returns<Ingredient[]>(),
+    supabase
+      .from('products')
+      .select(`id, name, price, operational_cost_buffer, is_percentage_buffer, recipe_items(amount_required, ingredients(average_price))`)
+      .returns<ProductRow[]>()
+  ]);
 
   let totalAssetValue = 0;
   let lowStockCount = 0;
@@ -38,11 +51,6 @@ export default async function Dashboard() {
       lowStockItems.push(ing.name);
     }
   });
-
-  const { data: products } = await supabase
-    .from('products')
-    .select(`id, name, price, operational_cost_buffer, is_percentage_buffer, recipe_items(amount_required, ingredients(average_price))`)
-    .returns<ProductRow[]>();
 
   let totalMarkupPercent = 0;
   let validProducts = 0;
@@ -129,6 +137,210 @@ export default async function Dashboard() {
     },
   ];
 
+  // 2. Financial Recap Fetching (Admins only)
+  let recapProps: any = null;
+  
+  if (isAdmin) {
+    const customStartStr = searchParams?.start as string | undefined;
+    const customEndStr = searchParams?.end as string | undefined;
+
+    const now = new Date();
+
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - 6);
+    weekStart.setHours(0, 0, 0, 0);
+
+    const monthStart = new Date(now);
+    monthStart.setDate(now.getDate() - 29);
+    monthStart.setHours(0, 0, 0, 0);
+
+    let queryStart = monthStart;
+    let queryEnd = now;
+
+    if (customStartStr && customEndStr) {
+      const cs = new Date(customStartStr);
+      if (!isNaN(cs.getTime())) queryStart = cs;
+        
+      const ce = new Date(customEndStr);
+      if (!isNaN(ce.getTime())) {
+        ce.setHours(23, 59, 59, 999);
+        queryEnd = ce;
+      }
+    }
+
+    const fetchStart = queryStart < monthStart ? queryStart : monthStart;
+    const fetchEnd = queryEnd > now ? queryEnd : now;
+
+    const [{ data: orders }, { data: orderItems }, { data: purchases }] = await Promise.all([
+      supabase
+        .from('orders')
+        .select('*')
+        .eq('status', 'paid')
+        .gte('completed_at', fetchStart.toISOString())
+        .lte('completed_at', fetchEnd.toISOString())
+        .order('completed_at', { ascending: true }),
+
+      supabase
+        .from('order_items')
+        .select('order_id, product_id, quantity, price, hpp, products(name)')
+        .returns<any[]>(),
+
+      supabase
+        .from('purchases')
+        .select('id, date, price, quantity, supplier, ingredients(name, category)')
+        .gte('date', fetchStart.toISOString())
+        .lte('date', fetchEnd.toISOString())
+        .order('date', { ascending: true })
+        .returns<PurchaseRow[]>(),
+    ]);
+
+    // Build daily chart data for the range
+    const dailyMap: Record<string, {
+      revenue: number;
+      hpp: number;
+      orders: number;
+      expenses: number;
+    }> = {};
+
+    const rangeStart = new Date(fetchStart);
+    rangeStart.setHours(0, 0, 0, 0);
+    const rangeEnd = new Date(fetchEnd);
+      
+    for (let d = new Date(rangeStart); d <= rangeEnd; d.setDate(d.getDate() + 1)) {
+      const key = d.toISOString().slice(0, 10);
+      dailyMap[key] = { revenue: 0, hpp: 0, orders: 0, expenses: 0 };
+    }
+
+    const todayOrders: any[] = [];
+    const weekOrders: any[] = [];
+    const monthOrders: any[] = [];
+    const customOrders: any[] = [];
+
+    const paymentStats: Record<string, number> = { cash: 0, qris: 0, debit: 0, credit: 0 };
+
+    (orders || []).forEach(o => {
+      const oDate = new Date(o.completed_at);
+      const key = oDate.toISOString().slice(0, 10);
+      if (dailyMap[key]) {
+        dailyMap[key].revenue += Number(o.total_price);
+        dailyMap[key].hpp += Number(o.total_hpp);
+        dailyMap[key].orders += 1;
+      }
+      if (oDate >= todayStart) todayOrders.push(o);
+      if (oDate >= weekStart) weekOrders.push(o);
+      if (oDate >= monthStart) monthOrders.push(o);
+      if (oDate >= queryStart && oDate <= queryEnd) customOrders.push(o);
+
+      if (oDate >= queryStart && oDate <= queryEnd && o.payment_method) {
+        paymentStats[o.payment_method] = (paymentStats[o.payment_method] || 0) + Number(o.total_price);
+      }
+    });
+
+    const chartData = Object.entries(dailyMap).map(([date, vals]) => ({
+      date,
+      revenue: Math.round(vals.revenue),
+      hpp: Math.round(vals.hpp),
+      profit: Math.round(vals.revenue - vals.hpp),
+      expenses: Math.round(vals.expenses),
+      orders: vals.orders,
+    }));
+
+    (purchases || []).forEach(p => {
+      const pDate = new Date(p.date);
+      const key = pDate.toISOString().slice(0, 10);
+      const chartEntry = chartData.find(c => c.date === key);
+      if (chartEntry) {
+        chartEntry.expenses += Number(p.price);
+      }
+    });
+
+    const chartDataWithCashflow = chartData.map((c) => ({
+      ...c,
+      cashflow: c.revenue - c.expenses,
+    }));
+
+    function buildPeriodStats(orderRows: any[], purchaseRows: PurchaseRow[]) {
+      const revenue = orderRows.reduce((s, r) => s + Number(r.total_price), 0);
+      const hpp = orderRows.reduce((s, r) => s + Number(r.total_hpp), 0);
+      const ordersCount = orderRows.length;
+        
+      const expenses = purchaseRows.reduce((s, r) => s + Number(r.price), 0);
+        
+      const grossProfit = revenue - hpp;
+      const netCashflow = revenue - expenses;
+      const margin = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
+        
+      return {
+        revenue,
+        hpp,
+        grossProfit,
+        expenses,
+        netCashflow,
+        orders: ordersCount,
+        purchaseCount: purchaseRows.length,
+        margin,
+      };
+    }
+
+    const todayPurchases = (purchases || []).filter(p => new Date(p.date) >= todayStart);
+    const weekPurchases = (purchases || []).filter(p => new Date(p.date) >= weekStart);
+    const monthPurchases = (purchases || []).filter(p => new Date(p.date) >= monthStart);
+    const customPurchases = (purchases || []).filter(p => new Date(p.date) >= queryStart && new Date(p.date) <= queryEnd);
+
+    const todayStats = buildPeriodStats(todayOrders, todayPurchases);
+    const weekStats = buildPeriodStats(weekOrders, weekPurchases);
+    const monthStats = buildPeriodStats(monthOrders, monthPurchases);
+    const customStats = customStartStr && customEndStr ? buildPeriodStats(customOrders, customPurchases) : undefined;
+
+    const referenceOrders = customStartStr && customEndStr ? customOrders : monthOrders;
+    const referenceOrderIds = new Set(referenceOrders.map(o => o.id));
+
+    const productMap: Record<string, { name: string; qty: number; revenue: number }> = {};
+    (orderItems || []).forEach(item => {
+      if (!referenceOrderIds.has(item.order_id)) return;
+      const pid = item.product_id;
+      if (!productMap[pid]) {
+        productMap[pid] = { name: item.products?.name ?? 'Unknown', qty: 0, revenue: 0 };
+      }
+      productMap[pid].qty += Number(item.quantity);
+      productMap[pid].revenue += Number(item.price) * Number(item.quantity);
+    });
+
+    const topProducts = Object.values(productMap)
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5)
+      .map(p => ({ ...p, revenue: Math.round(p.revenue) }));
+
+    const categoryMap: Record<string, number> = {};
+    const referencePurchases = customStartStr && customEndStr ? customPurchases : monthPurchases;
+    (referencePurchases || []).forEach(p => {
+      const cat = p.ingredients?.category ?? 'Lainnya';
+      categoryMap[cat] = (categoryMap[cat] ?? 0) + Number(p.price);
+    });
+
+    const topExpenseCategories = Object.entries(categoryMap)
+      .sort((a, b) => b[1] - a[1])
+      .map(([category, amount]) => ({ category, amount: Math.round(amount) }));
+
+    recapProps = {
+      todayStats,
+      weekStats,
+      monthStats,
+      customStats,
+      chartData: chartDataWithCashflow,
+      topProducts,
+      topExpenseCategories,
+      paymentStats,
+      initialTab: (customStartStr && customEndStr) ? 'custom' : 'daily',
+      customStartDate: customStartStr,
+      customEndDate: customEndStr,
+      basePath: '/',
+    };
+  }
+
   return (
     <div className="p-6 lg:p-10 max-w-7xl mx-auto space-y-10">
       {/* Header */}
@@ -141,7 +353,7 @@ export default async function Dashboard() {
             Intelijen Bisnis
           </h1>
           <p className="text-sm mt-1.5 text-zinc-500 font-medium tracking-tight">
-            Analisis performa dan kesehatan inventori secara real-time
+            Pusat kendali, analisa performa, dan kesehatan inventori secara real-time.
           </p>
         </div>
         <div className="hidden sm:flex items-center gap-2.5 text-[10px] font-bold uppercase tracking-widest px-4 py-2.5 rounded-full bg-zinc-100 text-zinc-600 border border-zinc-200">
@@ -149,36 +361,6 @@ export default async function Dashboard() {
           <Activity className="w-3.5 h-3.5" />
           Data Langsung
         </div>
-      </div>
-
-      {/* Stat cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {stats.map(({ label, sublabel, value, icon: Icon, href, isWarning }) => (
-          <Link
-            key={label}
-            href={href}
-            className="group block bg-white border border-zinc-200 rounded-3xl p-7 transition-all duration-300 hover:border-zinc-950 hover:shadow-2xl hover:shadow-zinc-950/5 relative overflow-hidden"
-          >
-            <div className="flex items-start justify-between mb-8">
-              <div className={cn(
-                "w-12 h-12 rounded-2xl flex items-center justify-center transition-colors shadow-sm",
-                isWarning ? "bg-zinc-950 text-white" : "bg-zinc-50 text-zinc-500 group-hover:bg-zinc-950 group-hover:text-white"
-              )}>
-                <Icon className="w-5 h-5" />
-              </div>
-              <ArrowUpRight className="w-5 h-5 text-zinc-300 transition-all duration-300 group-hover:text-zinc-950 group-hover:translate-x-1 group-hover:-translate-y-1" />
-            </div>
-            
-            <p className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-1.5">{label}</p>
-            <p className={cn(
-              "text-3xl font-bold tracking-tighter font-mono mb-2 transition-colors",
-              isWarning ? "text-zinc-950" : "text-zinc-950"
-            )}>
-              {value}
-            </p>
-            <p className="text-xs font-medium text-zinc-500">{sublabel}</p>
-          </Link>
-        ))}
       </div>
 
       {/* Quick actions */}
@@ -216,7 +398,7 @@ export default async function Dashboard() {
             <Link
               key={item.href}
               href={item.href}
-              className="group p-5 bg-white border border-zinc-200 rounded-2xl transition-all hover:border-zinc-950 hover:bg-zinc-950 hover:text-white"
+              className="group p-3 bg-white border border-zinc-200 rounded-2xl transition-all hover:border-zinc-950 hover:bg-zinc-950 hover:text-white"
             >
               <div className="flex items-center justify-between mb-1.5">
                 <p className="text-sm font-bold tracking-tight">{item.label}</p>
@@ -229,12 +411,53 @@ export default async function Dashboard() {
           ))}
       </div>
 
-      {/* Chart Section */}
+      {/* Financial Recap Section (Admin Only) */}
+      {isAdmin && recapProps && (
+        <FinancialRecap {...recapProps} />
+      )}
+
+      {/* Stat cards for inventory and margins */}
+      <div>
+        <h2 className="text-lg font-bold font-serif mb-4 flex items-center gap-2">
+          <Wallet className="w-5 h-5 text-zinc-400" />
+          Ringkasan Operasional
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {stats.map(({ label, sublabel, value, icon: Icon, href, isWarning }) => (
+            <Link
+              key={label}
+              href={href}
+              className="group block bg-white border border-zinc-200 rounded-3xl p-4 lg:p-6 transition-all duration-300 hover:border-zinc-950 hover:shadow-2xl hover:shadow-zinc-950/5 relative overflow-hidden"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className={cn(
+                  "w-10 h-10 rounded-2xl flex items-center justify-center transition-colors shadow-sm",
+                  isWarning ? "bg-zinc-950 text-white" : "bg-zinc-50 text-zinc-500 group-hover:bg-zinc-950 group-hover:text-white"
+                )}>
+                  <Icon className="w-5 h-5" />
+                </div>
+                <ArrowUpRight className="w-5 h-5 text-zinc-300 transition-all duration-300 group-hover:text-zinc-950 group-hover:translate-x-1 group-hover:-translate-y-1" />
+              </div>
+              
+              <p className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-1.5">{label}</p>
+              <p className={cn(
+                "text-2xl font-bold tracking-tighter font-mono mb-1 transition-colors",
+                isWarning ? "text-zinc-950" : "text-zinc-950"
+              )}>
+                {value}
+              </p>
+              <p className="text-xs font-medium text-zinc-500">{sublabel}</p>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* Purchase Trend Chart Section */}
       {canSeePurchaseTrend && (
         <div className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm shadow-zinc-950/5">
           <div className="flex items-center justify-between px-8 py-6 border-b border-zinc-100 bg-zinc-50/30">
             <div>
-              <h2 className="text-base font-bold text-zinc-950 tracking-tight">Tren Harga Satuan</h2>
+              <h2 className="text-base font-bold text-zinc-950 tracking-tight">Tren Harga Satuan Bahan Baku</h2>
               <p className="text-[11px] font-medium text-zinc-500 mt-1 uppercase tracking-wide">
                 Harga per unit tiap transaksi — bukan rata-rata
               </p>

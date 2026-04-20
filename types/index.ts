@@ -118,7 +118,7 @@ export interface ExpenseCategory {
   amount: number;
 }
 
-export type RecapTab = 'daily' | 'weekly' | 'monthly';
+export type RecapTab = 'daily' | 'weekly' | 'monthly' | 'custom';
 export type ChartMode = 'revenue' | 'cashflow';
 
 // POS Specific Types

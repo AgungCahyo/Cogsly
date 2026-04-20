@@ -3,67 +3,110 @@
 import { revalidatePath } from 'next/cache';
 import { requireRoles } from '@/lib/auth/server-auth';
 
+type RecipeItem = {
+  ingredient_id: string | null;
+  amount_required: number | null;
+};
+
+type OrderItemWithRecipe = {
+  quantity: number;
+  products: {
+    recipe_items: RecipeItem[];
+  } | null;
+};
+
+type OrderWithItems = {
+  id: string;
+  table_id: string | null;
+  status: string;
+  order_items: OrderItemWithRecipe[];
+};
+
 export async function saveOrder(cart: any[], tableId: string, customerName: string) {
   const { supabase } = await requireRoles(['admin', 'cashier', 'waiter']);
   const { data: { user } } = await supabase.auth.getUser();
 
-  // 1. Calculate totals
-  const totalPrice = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-  const totalHPP = cart.reduce((sum, item) => sum + (item.hpp * item.qty), 0);
+  if (!cart || cart.length === 0) throw new Error('Keranjang kosong.');
+  if (!tableId) throw new Error('Meja belum dipilih.');
 
-  // 2. Check for existing pending order for this table
+  const totalPrice = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const totalHPP = cart.reduce((sum, item) => sum + item.hpp * item.qty, 0);
+
   const { data: existingOrder } = await supabase
     .from('orders')
     .select('id')
     .eq('table_id', tableId)
     .eq('status', 'pending')
-    .single();
+    .maybeSingle();
 
-  let orderId = existingOrder?.id;
+  let orderId = existingOrder?.id as string | undefined;
 
   if (!orderId) {
-    // Insert new order
     const { data: newOrder, error: orderError } = await supabase
       .from('orders')
       .insert([{
         table_id: tableId,
         waiter_id: user?.id,
-        customer_name: customerName,
+        customer_name: customerName || null,
         status: 'pending',
         total_price: totalPrice,
-        total_hpp: totalHPP
+        total_hpp: totalHPP,
       }])
-      .select()
+      .select('id')
       .single();
 
-    if (orderError) throw new Error("Gagal membuat pesanan: " + orderError.message);
+    if (orderError || !newOrder) {
+      throw new Error('Gagal membuat pesanan: ' + (orderError?.message ?? 'Unknown error'));
+    }
+
     orderId = newOrder.id;
 
-    // Update table status
-    await supabase.from('tables').update({ status: 'occupied' }).eq('id', tableId);
-  } else {
-    // Update existing order totals
-    await supabase.from('orders').update({
-      total_price: totalPrice,
-      total_hpp: totalHPP,
-      customer_name: customerName
-    }).eq('id', orderId);
+    const { error: tableError } = await supabase
+      .from('tables')
+      .update({ status: 'occupied' })
+      .eq('id', tableId);
 
-    // Delete existing items to replace (simple sync)
-    await supabase.from('order_items').delete().eq('order_id', orderId);
+    if (tableError) {
+      await supabase.from('orders').delete().eq('id', orderId);
+      throw new Error('Gagal mengupdate status meja.');
+    }
+  } else {
+    const { error: updateError } = await supabase
+      .from('orders')
+      .update({
+        total_price: totalPrice,
+        total_hpp: totalHPP,
+        customer_name: customerName || null,
+      })
+      .eq('id', orderId);
+
+    if (updateError) throw new Error('Gagal mengupdate pesanan: ' + updateError.message);
+
+    const { error: deleteError } = await supabase
+      .from('order_items')
+      .delete()
+      .eq('order_id', orderId);
+
+    if (deleteError) throw new Error('Gagal memperbarui item pesanan.');
   }
 
-  // 3. Insert items
-  const orderItems = cart.map(item => ({
+  const orderItems = cart.map((item) => ({
     order_id: orderId,
     product_id: item.id,
     quantity: item.qty,
     price: item.price,
-    hpp: item.hpp
+    hpp: item.hpp,
   }));
 
   const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
-  if (itemsError) throw new Error("Gagal menyimpan detail pesanan");
+
+  if (itemsError) {
+    if (!existingOrder?.id) {
+      await supabase.from('orders').delete().eq('id', orderId);
+      await supabase.from('tables').update({ status: 'available' }).eq('id', tableId);
+    }
+    throw new Error('Gagal menyimpan detail pesanan: ' + itemsError.message);
+  }
 
   revalidatePath('/pos');
   return orderId;
@@ -72,13 +115,14 @@ export async function saveOrder(cart: any[], tableId: string, customerName: stri
 export async function finalizePayment(orderId: string, paymentMethod: string) {
   const { supabase } = await requireRoles(['admin', 'cashier']);
 
-  // 1. Get Order with Items and Recipes
-  const { data: order, error: orderError } = await supabase
+  const { data: rawOrder, error: orderError } = await supabase
     .from('orders')
     .select(`
-      *,
+      id,
+      table_id,
+      status,
       order_items (
-        *,
+        quantity,
         products (
           recipe_items (
             ingredient_id,
@@ -90,33 +134,84 @@ export async function finalizePayment(orderId: string, paymentMethod: string) {
     .eq('id', orderId)
     .single();
 
-  if (orderError || !order) throw new Error("Pesanan tidak ditemukan");
+  if (orderError || !rawOrder) throw new Error('Pesanan tidak ditemukan.');
 
-  // 2. Deduct Ingredients
-  const ingredientMap: Record<string, number> = {};
-  order.order_items.forEach((item: any) => {
-    item.products?.recipe_items?.forEach((recipe: any) => {
-      const needed = recipe.amount_required * item.quantity;
-      ingredientMap[recipe.ingredient_id] = (ingredientMap[recipe.ingredient_id] || 0) + needed;
-    });
-  });
+  const order = rawOrder as unknown as OrderWithItems;
 
-  for (const [ingId, amount] of Object.entries(ingredientMap)) {
-    const { data: ing } = await supabase.from('ingredients').select('stock').eq('id', ingId).single();
-    if (ing) {
-      const newStock = Number(ing.stock) - amount;
-      await supabase.from('ingredients').update({ stock: newStock }).eq('id', ingId);
+  if (order.status === 'paid') throw new Error('Pesanan ini sudah dibayar.');
+  if (order.status === 'cancelled') throw new Error('Pesanan ini sudah dibatalkan.');
+
+  // Aggregate ingredient deductions
+  const ingredientDeductions: Record<string, number> = {};
+  for (const item of order.order_items) {
+    const recipeItems = item.products?.recipe_items ?? [];
+    for (const recipe of recipeItems) {
+      if (!recipe.ingredient_id) continue;
+      const needed = Number(recipe.amount_required) * Number(item.quantity);
+      ingredientDeductions[recipe.ingredient_id] =
+        (ingredientDeductions[recipe.ingredient_id] ?? 0) + needed;
     }
   }
 
-  // 3. Finalize Order
-  await supabase.from('orders').update({
-    status: 'paid',
-    payment_method: paymentMethod,
-    completed_at: new Date().toISOString()
-  }).eq('id', orderId);
+  // ── GUARD: check stock sufficiency before deducting ──────────────────────
+  const insufficientItems: string[] = [];
+  for (const [ingId, needed] of Object.entries(ingredientDeductions)) {
+    const { data: ing } = await supabase
+      .from('ingredients')
+      .select('stock, name')
+      .eq('id', ingId)
+      .single();
 
-  // 4. Free Table
+    if (!ing) continue;
+    if (Number(ing.stock) < needed) {
+      insufficientItems.push(`${ing.name} (butuh ${needed}, tersedia ${Number(ing.stock)})`);
+    }
+  }
+
+  if (insufficientItems.length > 0) {
+    throw new Error(
+      `Stok tidak mencukupi untuk menyelesaikan transaksi:\n${insufficientItems.join('\n')}`
+    );
+  }
+
+  // Deduct stock atomically via RPC
+  for (const [ingId, amount] of Object.entries(ingredientDeductions)) {
+    const { error: rpcError } = await supabase.rpc('deduct_ingredient_stock', {
+      p_ingredient_id: ingId,
+      p_amount: amount,
+    });
+
+    if (rpcError) {
+      console.warn(`RPC unavailable for ${ingId}, falling back:`, rpcError.message);
+      const { data: ing } = await supabase
+        .from('ingredients')
+        .select('stock')
+        .eq('id', ingId)
+        .single();
+      if (ing) {
+        await supabase
+          .from('ingredients')
+          .update({ stock: Math.max(0, Number(ing.stock) - amount) })
+          .eq('id', ingId);
+      }
+    }
+  }
+
+  // Mark as paid — idempotency guard
+  const { error: orderUpdateError } = await supabase
+    .from('orders')
+    .update({
+      status: 'paid',
+      payment_method: paymentMethod,
+      completed_at: new Date().toISOString(),
+    })
+    .eq('id', orderId)
+    .eq('status', 'pending');
+
+  if (orderUpdateError) {
+    throw new Error('Gagal menyelesaikan pembayaran: ' + orderUpdateError.message);
+  }
+
   if (order.table_id) {
     await supabase.from('tables').update({ status: 'available' }).eq('id', order.table_id);
   }
@@ -127,50 +222,108 @@ export async function finalizePayment(orderId: string, paymentMethod: string) {
   return true;
 }
 
+// ── Void/cancel a pending order ──────────────────────────────────────────────
+export async function voidOrder(orderId: string, reason: string) {
+  const { supabase } = await requireRoles(['admin', 'cashier']);
+
+  const { data: order, error: fetchError } = await supabase
+    .from('orders')
+    .select('id, table_id, status')
+    .eq('id', orderId)
+    .single();
+
+  if (fetchError || !order) throw new Error('Pesanan tidak ditemukan.');
+  if (order.status === 'paid') throw new Error('Pesanan yang sudah dibayar tidak bisa dibatalkan. Hubungi admin.');
+  if (order.status === 'cancelled') throw new Error('Pesanan ini sudah dibatalkan sebelumnya.');
+
+  if (!reason?.trim()) throw new Error('Alasan pembatalan wajib diisi.');
+
+  const { error: voidError } = await supabase
+    .from('orders')
+    .update({
+      status: 'cancelled',
+      void_reason: reason.trim(),
+      void_at: new Date().toISOString(),
+    })
+    .eq('id', orderId)
+    .eq('status', 'pending');
+
+  if (voidError) throw new Error('Gagal membatalkan pesanan: ' + voidError.message);
+
+  // Free the table
+  if (order.table_id) {
+    await supabase.from('tables').update({ status: 'available' }).eq('id', order.table_id);
+  }
+
+  revalidatePath('/pos');
+  return true;
+}
+
 export async function getRecentSales() {
   const { supabase } = await requireRoles(['admin', 'cashier', 'waiter']);
+
+  // Filter to current shift (today) by default
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
   const { data, error } = await supabase
     .from('orders')
     .select(`
-      *,
+      id,
+      customer_name,
+      total_price,
+      payment_method,
+      completed_at,
+      tables (name),
       order_items (
-        *,
+        quantity,
+        price,
         products (name)
       )
     `)
     .eq('status', 'paid')
+    .gte('completed_at', todayStart.toISOString())
     .order('completed_at', { ascending: false })
-    .limit(20);
+    .limit(50);
 
-  return data || [];
+  if (error) throw new Error('Gagal memuat riwayat penjualan: ' + error.message);
+  return data ?? [];
 }
 
 export async function getOrderByTable(tableId: string) {
   const { supabase } = await requireRoles(['admin', 'cashier', 'waiter']);
+
   const { data, error } = await supabase
     .from('orders')
     .select(`
-      *,
+      id,
+      customer_name,
       order_items (
-        *,
+        product_id,
+        quantity,
+        price,
+        hpp,
         products (
-          id, name, price, recipe_items (ingredient_id, amount_required)
+          id,
+          name,
+          price,
+          recipe_items (ingredient_id, amount_required)
         )
       )
     `)
     .eq('table_id', tableId)
     .eq('status', 'pending')
-    .single();
+    .maybeSingle();
 
   if (error || !data) return null;
 
-  const cart = data.order_items.map((item: any) => ({
+  const cart = (data.order_items as any[]).map((item) => ({
     id: item.product_id,
-    name: item.products.name,
+    name: item.products?.name ?? '',
     price: Number(item.price),
     hpp: Number(item.hpp),
     qty: Number(item.quantity),
-    recipe_items: item.products.recipe_items
+    recipe_items: item.products?.recipe_items ?? [],
   }));
 
   return { order: data, cart };

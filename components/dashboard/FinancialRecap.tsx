@@ -1,57 +1,29 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-  PieChart,
-  Pie,
+import { useRouter } from 'next/navigation';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie,
 } from 'recharts';
 import { format, parseISO } from 'date-fns';
 import { id } from 'date-fns/locale';
-import {
-  TrendingUp,
-  TrendingDown,
-  ShoppingBag,
-  DollarSign,
-  Package,
-  BarChart3,
-  Calendar,
-  Star,
-  ArrowDownLeft,
-  ArrowUpRight,
-  Wallet,
-  ShoppingCart,
-  Printer,
-  CreditCard,
-  QrCode,
-  Banknote,
-  PieChart as PieIcon
+import { TrendingUp, TrendingDown, ShoppingBag, DollarSign, Package, BarChart3, Calendar, Star, ArrowDownLeft, ArrowUpRight, Wallet, ShoppingCart, Printer, CreditCard, QrCode, Banknote, PieChart as PieIcon
 } from 'lucide-react';
 
-import { 
-  PeriodStats, 
-  ChartPoint, 
-  TopProduct, 
-  ExpenseCategory, 
-  RecapTab as Tab, 
-  ChartMode 
-} from '@/types';
+import { PeriodStats, ChartPoint, TopProduct, ExpenseCategory, RecapTab as Tab, ChartMode } from '@/types';
 
 type Props = {
   todayStats: PeriodStats;
   weekStats: PeriodStats;
   monthStats: PeriodStats;
+  customStats?: PeriodStats;
   chartData: ChartPoint[];
   topProducts: TopProduct[];
   topExpenseCategories: ExpenseCategory[];
   paymentStats: Record<string, number>;
+  initialTab?: Tab;
+  customStartDate?: string;
+  customEndDate?: string;
+  basePath?: string;
 };
 
 function formatRupiah(n: number) {
@@ -165,26 +137,63 @@ const CustomTooltip = ({
   );
 };
 
-export function RecapClient({
+export function FinancialRecap({
   todayStats,
   weekStats,
   monthStats,
+  customStats,
   chartData,
   topProducts,
   topExpenseCategories,
-  paymentStats
+  paymentStats,
+  initialTab = 'daily',
+  customStartDate,
+  customEndDate,
+  basePath = '/recap'
 }: Props) {
-  const [tab, setTab] = useState<Tab>('daily');
+  const router = useRouter();
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [chartMode, setChartMode] = useState<ChartMode>('revenue');
+  const [customStart, setCustomStart] = useState(customStartDate || '');
+  const [customEnd, setCustomEnd] = useState(customEndDate || '');
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
-  const stats = tab === 'daily' ? todayStats : tab === 'weekly' ? weekStats : monthStats;
+  const applyCustomFilter = () => {
+    if (customStart && customEnd) {
+      router.push(`${basePath}?start=${customStart}&end=${customEnd}`);
+    }
+  };
+
+  const clearCustomFilter = () => {
+    setCustomStart('');
+    setCustomEnd('');
+    if (tab === 'custom') setTab('daily');
+    router.push(basePath);
+  };
+
+  const stats = tab === 'daily' ? todayStats : tab === 'weekly' ? weekStats : tab === 'monthly' ? monthStats : (customStats || monthStats);
 
   const visibleData =
     tab === 'daily'
       ? chartData.slice(-1)
       : tab === 'weekly'
       ? chartData.slice(-7)
-      : chartData;
+      : tab === 'monthly'
+      ? chartData.slice(-30)
+      : (() => {
+          // If custom, we filter the chartData to only include dates within the custom range
+          if (customStartDate && customEndDate) {
+            const cs = new Date(customStartDate);
+            cs.setHours(0, 0, 0, 0);
+            const ce = new Date(customEndDate);
+            ce.setHours(23, 59, 59, 999);
+            return chartData.filter(d => {
+              const dt = new Date(d.date);
+              return dt >= cs && dt <= ce;
+            });
+          }
+          return chartData;
+      })();
 
   const paymentChartData = Object.entries(paymentStats).map(([name, value]) => ({ name, value }));
   const COLORS = ['#09090b', '#71717a', '#a1a1aa', '#e4e4e7'];
@@ -192,8 +201,8 @@ export function RecapClient({
   return (
     <div className="p-6 lg:p-10 max-w-7xl mx-auto space-y-10 print:p-0 print:space-y-6 print:max-w-none print:w-full">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-end sm:items-center justify-between gap-8 border-b border-zinc-200 pb-10 print:pb-6">
-        <div>
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-8 border-b border-zinc-200 pb-10 print:pb-6">
+        <div className="flex-1">
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 mb-2 font-mono">
             ◆ Restaurant Intelligence
           </p>
@@ -201,23 +210,78 @@ export function RecapClient({
             Financial Dashboard
           </h1>
           <p className="text-sm mt-1.5 text-zinc-500 font-medium">
-            Periode: <span className="text-zinc-950">{tab === 'daily' ? 'Hari Ini' : tab === 'weekly' ? 'Minggu Ini' : 'Bulan Ini'}</span>
+            Periode: <span className="text-zinc-950">{tab === 'daily' ? 'Hari Ini' : tab === 'weekly' ? 'Minggu Ini' : tab === 'monthly' ? 'Bulan Ini' : 'Khusus'}</span>
           </p>
         </div>
 
-        <div className="flex bg-zinc-100 p-1.5 rounded-2xl border border-zinc-200 print:hidden">
-          {(['daily', 'weekly', 'monthly'] as Tab[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={cn(
-                "px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all",
-                tab === t ? "bg-zinc-950 text-white shadow-lg" : "text-zinc-400 hover:text-zinc-950"
-              )}
-            >
-              {t === 'daily' ? 'Hari Ini' : t === 'weekly' ? '7 Hari' : '30 Hari'}
-            </button>
-          ))}
+        <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4 w-full lg:w-auto z-50">
+          <div className="relative">
+            <div className="flex bg-zinc-100 p-1.5 rounded-2xl border border-zinc-200 print:hidden shrink-0 overflow-x-auto max-w-full">
+              {(['daily', 'weekly', 'monthly'] as Tab[]).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => {
+                     setTab(t);
+                     setShowDatePicker(false);
+                     if (customStartDate || customEndDate) {
+                         router.push(basePath);
+                     }
+                  }}
+                  className={cn(
+                    "px-4 md:px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all whitespace-nowrap",
+                    tab === t ? "bg-zinc-950 text-white shadow-lg" : "text-zinc-400 hover:text-zinc-950"
+                  )}
+                >
+                  {t === 'daily' ? 'Hari Ini' : t === 'weekly' ? '7 Hari' : '30 Hari'}
+                </button>
+              ))}
+              <button
+                 onClick={() => {
+                    setShowDatePicker(!showDatePicker);
+                    if (!showDatePicker && customStats) setTab('custom');
+                 }}
+                 className={cn(
+                    "px-4 md:px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all whitespace-nowrap flex items-center gap-2",
+                    tab === 'custom' || showDatePicker ? "bg-zinc-950 text-white shadow-lg" : "text-zinc-400 hover:text-zinc-950"
+                 )}
+              >
+                 <Calendar className="w-3.5 h-3.5" />
+                 {customStartDate && customEndDate
+                    ? `${format(parseISO(customStartDate), 'dd MMM', { locale: id })} - ${format(parseISO(customEndDate), 'dd MMM', { locale: id })}`
+                    : 'Kustom'}
+              </button>
+            </div>
+            
+            {showDatePicker && (
+               <div className="absolute top-full mt-2 right-0 bg-white border border-zinc-200 p-5 rounded-3xl shadow-xl z-50 flex flex-col gap-4 w-72 animate-in fade-in zoom-in-95 origin-top-right print:hidden">
+                  <div className="flex items-center justify-between">
+                     <h4 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 font-mono">Filter Tanggal</h4>
+                     {(customStartDate || customEndDate) && (
+                        <button onClick={() => {
+                           clearCustomFilter();
+                           setShowDatePicker(false);
+                        }} className="text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors">Reset</button>
+                     )}
+                  </div>
+                  <div className="flex flex-col gap-3">
+                     <div>
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1.5 block">Dari Tanggal</label>
+                        <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-sm text-zinc-950 outline-none focus:border-zinc-500 transition-colors" />
+                     </div>
+                     <div>
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1.5 block">Sampai Tanggal</label>
+                        <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-sm text-zinc-950 outline-none focus:border-zinc-500 transition-colors" />
+                     </div>
+                  </div>
+                  <button onClick={() => {
+                     applyCustomFilter();
+                     setShowDatePicker(false);
+                  }} disabled={!customStart || !customEnd} className="w-full bg-zinc-950 text-white py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest mt-2 disabled:opacity-50 transition-opacity">
+                     Terapkan
+                  </button>
+               </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -353,33 +417,43 @@ export function RecapClient({
             <p className="text-[10px] font-bold uppercase text-zinc-300">Period Matriks Rundown</p>
           </div>
         </div>
-        <table className="w-full text-left">
-          <thead className="bg-zinc-50/50">
-            <tr>
-              <th className="px-10 py-5 text-[10px] font-bold uppercase text-zinc-400 tracking-widest">Metric</th>
-              <th className="px-10 py-5 text-[10px] font-bold uppercase text-zinc-400 tracking-widest">Today</th>
-              <th className="px-10 py-5 text-[10px] font-bold uppercase text-zinc-400 tracking-widest">Weekly</th>
-              <th className="px-10 py-5 text-[10px] font-bold uppercase text-zinc-400 tracking-widest">Monthly</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-50">
-            {[
-              { label: 'Revenue', today: todayStats.revenue, week: weekStats.revenue, month: monthStats.revenue, type: 'money' },
-              { label: 'Orders', today: todayStats.orders, week: weekStats.orders, month: monthStats.orders, type: 'count' },
-              { label: 'Gross Margin', today: todayStats.margin, week: weekStats.margin, month: monthStats.margin, type: 'percent' },
-              { label: 'Net Flow', today: todayStats.netCashflow, week: weekStats.netCashflow, month: monthStats.netCashflow, type: 'money' },
-            ].map(row => (
-              <tr key={row.label} className="hover:bg-zinc-50/50 transition-colors">
-                <td className="px-10 py-5 text-[10px] font-bold uppercase text-zinc-500">{row.label}</td>
-                {[row.today, row.week, row.month].map((v, i) => (
-                  <td key={i} className="px-10 py-5 text-sm font-bold font-mono">
-                    {row.type === 'money' ? formatRupiah(v) : row.type === 'percent' ? `${v.toFixed(1)}%` : v}
-                  </td>
-                ))}
+        <div className="w-full overflow-x-auto">
+          <table className="w-full text-left min-w-[600px]">
+            <thead className="bg-zinc-50/50">
+              <tr>
+                <th className="px-10 py-5 text-[10px] font-bold uppercase text-zinc-400 tracking-widest whitespace-nowrap">Metric</th>
+                <th className="px-10 py-5 text-[10px] font-bold uppercase text-zinc-400 tracking-widest whitespace-nowrap">Hari Ini</th>
+                <th className="px-10 py-5 text-[10px] font-bold uppercase text-zinc-400 tracking-widest whitespace-nowrap">7 Hari</th>
+                <th className="px-10 py-5 text-[10px] font-bold uppercase text-zinc-400 tracking-widest whitespace-nowrap">30 Hari</th>
+                {customStats && (
+                  <th className="px-10 py-5 text-[10px] font-bold uppercase text-zinc-950 tracking-widest bg-zinc-100 whitespace-nowrap">Kustom</th>
+                )}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-zinc-50">
+              {[
+                { label: 'Revenue', today: todayStats.revenue, week: weekStats.revenue, month: monthStats.revenue, custom: customStats?.revenue, type: 'money' },
+                { label: 'Orders', today: todayStats.orders, week: weekStats.orders, month: monthStats.orders, custom: customStats?.orders, type: 'count' },
+                { label: 'Gross Margin', today: todayStats.margin, week: weekStats.margin, month: monthStats.margin, custom: customStats?.margin, type: 'percent' },
+                { label: 'Net Flow', today: todayStats.netCashflow, week: weekStats.netCashflow, month: monthStats.netCashflow, custom: customStats?.netCashflow, type: 'money' },
+              ].map(row => (
+                <tr key={row.label} className="hover:bg-zinc-50/50 transition-colors">
+                  <td className="px-10 py-5 text-[10px] font-bold uppercase text-zinc-500 whitespace-nowrap">{row.label}</td>
+                  {[row.today, row.week, row.month].map((v, i) => (
+                    <td key={i} className="px-10 py-5 text-sm font-bold font-mono whitespace-nowrap">
+                      {row.type === 'money' ? formatRupiah(v as number) : row.type === 'percent' ? `${(v as number).toFixed(1)}%` : v}
+                    </td>
+                  ))}
+                  {customStats && row.custom !== undefined && (
+                    <td className="px-10 py-5 text-sm font-bold font-mono bg-zinc-50 border-l border-zinc-100 whitespace-nowrap text-zinc-950">
+                      {row.type === 'money' ? formatRupiah(row.custom) : row.type === 'percent' ? `${row.custom.toFixed(1)}%` : row.custom}
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
