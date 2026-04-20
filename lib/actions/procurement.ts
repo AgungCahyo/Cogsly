@@ -186,7 +186,7 @@ export async function submitInternalProduction(formData: FormData) {
     fail('Gagal membaca data bahan untuk proses produksi.');
   }
 
-  const ingredientMap = new Map(ingredients.map((ing) => [ing.id as string, ing]));
+  const ingredientMap = new Map(ingredients!.map((ing) => [ing.id as string, ing]));
   const outputIngredient = ingredientMap.get(ingredient_id);
   if (!outputIngredient) fail('Bahan hasil tidak ditemukan.');
 
@@ -212,6 +212,8 @@ export async function submitInternalProduction(formData: FormData) {
   if (insufficientItems.length > 0) {
     fail(`Stok komponen tidak cukup: ${insufficientItems.join(' | ')}`);
   }
+
+  if (!outputIngredient) return;
 
   const restoreComponentsBestEffort = async () => {
     for (const [componentId, needed] of aggregated.entries()) {
@@ -280,7 +282,7 @@ export async function submitInternalProduction(formData: FormData) {
   });
 
   if (outputRpcError) {
-    const oldStock = Number(outputIngredient.stock) || 0;
+    const oldStock = Number(outputIngredient?.stock) || 0;
     const oldAvgPrice = Number(outputIngredient.average_price) || 0;
     const newStock = oldStock + quantity;
     const newAvgPrice =
