@@ -11,7 +11,6 @@ import {
   ShoppingBag,
   Menu,
   X,
-  BarChart3,
   LogOut,
   Calendar,
 } from 'lucide-react';
@@ -19,15 +18,13 @@ import { cn } from '@/lib/cn';
 import { logout } from '@/app/login/actions';
 import { Profile, UserRole } from '@/types';
 
-/** Sidebar visibility — server enforcement lives in `lib/auth/access-policy.ts` (middleware + actions). */
 const navigation = [
   { name: 'Dasbor', href: '/', icon: LayoutDashboard, description: 'Ringkasan bisnis', roles: ['admin', 'warehouse', 'cashier'] },
-  { name: 'Reservasi', href: '/reservations', icon: Calendar, description: 'Booking meja', roles: ['admin', 'cashier', 'waiter'] },
   { name: 'Bahan Baku', href: '/ingredients', icon: Package, description: 'Stok & material', roles: ['admin', 'warehouse'] },
   { name: 'Pembelian', href: '/procurement', icon: ShoppingCart, description: 'Log pengadaan', roles: ['admin', 'warehouse'] },
   { name: 'Resep & HPP', href: '/recipes', icon: UtensilsCrossed, description: 'Harga pokok', roles: ['admin'] },
+  { name: 'Reservasi', href: '/reservations', icon: Calendar, description: 'Booking meja', roles: ['admin', 'cashier', 'waiter'] },
   { name: 'Kasir', href: '/pos', icon: ShoppingBag, description: 'Proses transaksi', roles: ['admin', 'cashier', 'waiter'] },
-
 ];
 
 export function LayoutShell({ children, profile }: { children: React.ReactNode; profile: Profile | null }) {
@@ -46,7 +43,8 @@ export function LayoutShell({ children, profile }: { children: React.ReactNode; 
   };
 
   return (
-    <div className="min-h-screen h-screen  w-full flex bg-zinc-50 font-sans">
+    <div className="min-h-screen h-screen w-full flex bg-zinc-50 font-sans">
+      {/* Overlay */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-40 lg:hidden bg-zinc-950/20 backdrop-blur-sm"
@@ -55,37 +53,32 @@ export function LayoutShell({ children, profile }: { children: React.ReactNode; 
         />
       )}
 
+      {/* Sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-64 flex flex-col transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static',
+          'fixed inset-y-0 left-0 z-50 w-60 flex flex-col transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static',
           'bg-white border-r border-zinc-200 shadow-sm print:hidden',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
-        <div className="flex items-center justify-between h-20 px-6 shrink-0 border-b border-zinc-100">
-          <div className="flex items-center gap-3">
-            
-            <div>
-              <span className="text-2xl font-bold font-serif text-zinc-950">F&B MANAJER</span>
-             
-            </div>
-          </div>
+        {/* Logo */}
+        <div className="flex items-center justify-between h-14 px-4 shrink-0 border-b border-zinc-100">
+          <span className="text-lg font-bold font-serif text-zinc-950">F&B MANAJER</span>
           <button
             type="button"
             onClick={() => setSidebarOpen(false)}
-            className="lg:hidden p-1.5 rounded-lg hover:bg-zinc-50 text-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950/25 focus-visible:ring-offset-2"
+            className="lg:hidden p-1.5 rounded-lg hover:bg-zinc-50 text-zinc-400"
             aria-label="Tutup menu"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto" aria-label="Menu utama">
-          <p className="px-3 pb-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">Menu Utama</p>
+        {/* Nav */}
+        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto" aria-label="Menu utama">
+          <p className="px-2 pb-2 pt-1 text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-400">Menu Utama</p>
           {filteredNav.map((item) => {
-            const isActive =
-              pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
-
+            const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
             return (
               <Link
                 key={item.name}
@@ -93,67 +86,64 @@ export function LayoutShell({ children, profile }: { children: React.ReactNode; 
                 onClick={() => setSidebarOpen(false)}
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
-                  'group flex items-center gap-3 px-1 py-1 rounded-xl transition-all duration-200 relative',
+                  'group flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition-all duration-200',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950/25 focus-visible:ring-offset-2',
                   isActive
                     ? 'bg-zinc-950 text-white shadow-md shadow-zinc-950/20'
                     : 'text-zinc-500 hover:bg-zinc-50 hover:text-zinc-950'
                 )}
               >
-                <div
-                  className={cn(
-                    'p-1.5 rounded-lg transition-colors',
-                    isActive ? 'bg-white/10' : 'bg-transparent group-hover:bg-zinc-100'
-                  )}
-                >
-                  <item.icon className="w-4 h-4 shrink-0" aria-hidden />
+                <div className={cn(
+                  'p-1.5 rounded-lg transition-colors shrink-0',
+                  isActive ? 'bg-white/10' : 'bg-transparent group-hover:bg-zinc-100'
+                )}>
+                  <item.icon className="w-3.5 h-3.5" aria-hidden />
                 </div>
-
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold">{item.name}</p>
-                </div>
+                <span className="text-xs font-semibold">{item.name}</span>
               </Link>
             );
           })}
         </nav>
 
-        <div className="p-2 border-t border-zinc-100 bg-zinc-50/50 space-y-2">
-          <div className="flex items-center gap-3 px-2 py-2 rounded-xl bg-white border border-zinc-200">
-            <div className="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold bg-zinc-100 text-zinc-950 shadow-inner">
+        {/* Profile & Logout */}
+        <div className="p-2.5 border-t border-zinc-100 bg-zinc-50/50 space-y-1.5">
+          <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl bg-white border border-zinc-200">
+            <div className="w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold bg-zinc-100 text-zinc-950 shadow-inner shrink-0">
               {profile?.full_name?.charAt(0) || role.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-bold text-zinc-950 truncate">{profile?.full_name || 'User'}</p>
-              <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{role}</p>
+              <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{role}</p>
             </div>
           </div>
-
           <button
             type="button"
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 transition-all font-bold text-[10px] uppercase tracking-widest focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30 focus-visible:ring-offset-2"
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-red-500 hover:bg-red-50 transition-all font-bold text-[9px] uppercase tracking-widest"
           >
-            <LogOut className="w-4 h-4" aria-hidden />
-            Keluar Sistem
+            <LogOut className="w-3.5 h-3.5" aria-hidden />
+            Keluar
           </button>
         </div>
       </aside>
 
+      {/* Main */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="lg:hidden flex items-center justify-between h-16 px-6 bg-white border-b border-zinc-200 shrink-0 print:hidden">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-zinc-950 text-white">
-              <span className="font-serif font-bold text-base">C</span>
+        {/* Mobile Header */}
+        <header className="lg:hidden flex items-center justify-between h-12 px-4 bg-white border-b border-zinc-200 shrink-0 print:hidden">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-zinc-950 text-white">
+              <span className="font-serif font-bold text-sm">C</span>
             </div>
             <span className="text-sm font-bold font-serif tracking-widest text-zinc-950">COGSLY</span>
           </div>
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
-            className="p-2.5 rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950/25 focus-visible:ring-offset-2"
+            className="p-2 rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-500"
             aria-label="Buka menu"
           >
-            <Menu className="w-5 h-5" />
+            <Menu className="w-4 h-4" />
           </button>
         </header>
 

@@ -81,7 +81,7 @@ export function Select({
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "w-full bg-zinc-50 border transition-all duration-300 rounded-2xl px-5 py-3.5 flex items-center justify-between text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950/15 focus-visible:ring-offset-2",
+          "w-full min-h-[3rem] bg-zinc-50 border transition-all duration-300 rounded-2xl px-5 py-3.5 flex items-center justify-between text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950/15 focus-visible:ring-offset-2",
           isOpen ? "border-zinc-950 ring-2 ring-zinc-950/5" : "border-zinc-200 hover:border-zinc-950"
         )}
       >
@@ -110,7 +110,7 @@ export function Select({
                   placeholder="Cari..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-zinc-50 border border-transparent rounded-xl pl-10 pr-4 py-2 text-xs font-bold text-zinc-950 placeholder:text-zinc-200 focus:outline-none focus:border-zinc-100"
+                  className="w-full min-h-[3rem] bg-zinc-50 border border-transparent rounded-xl pl-10 pr-4 py-2 text-xs font-bold text-zinc-950 placeholder:text-zinc-200 focus:outline-none focus:border-zinc-100"
                 />
               </div>
             </div>

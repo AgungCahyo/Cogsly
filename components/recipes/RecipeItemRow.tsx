@@ -34,13 +34,13 @@ export function RecipeItemRow({
 
   return (
     <div
-      className={`rounded-2xl overflow-hidden border transition-all duration-300 ${
+      className={`rounded-2xl  border transition-all duration-300 ${
         isLowStock 
           ? 'border-zinc-950 bg-zinc-50 shadow-inner ring-1 ring-zinc-950' 
           : 'border-zinc-100 bg-white hover:border-zinc-200'
       }`}
     >
-      <div className="flex items-center gap-4 p-4">
+      <div className="flex flex-col md:flex-row items-start md:items-center gap-4 p-4">
         <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold transition-colors ${
           isLowStock ? 'bg-zinc-950 text-white' : 'bg-zinc-100 text-zinc-400'
         }`}>
@@ -89,7 +89,7 @@ export function RecipeItemRow({
             value={item.amount}
             onChange={e => onUpdate(item.id, 'amount', e.target.value === '' ? '' : Number(e.target.value))}
             placeholder="0.00"
-            className="w-16 text-right text-sm font-bold font-mono tracking-tighter bg-transparent border-none outline-none text-zinc-950 placeholder:text-zinc-200"
+            className="w-full md:w-24 md:w-24 md:w-16 text-right text-sm font-bold font-mono tracking-tighter bg-transparent border-none outline-none text-zinc-950 placeholder:text-zinc-200"
           />
           {selectedIng && (
             <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-300">

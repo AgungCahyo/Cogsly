@@ -8,7 +8,6 @@ import { Ingredient } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
-// ─── Async data component — isolated so errors don't crash the whole page ────
 async function IngredientTable() {
   const supabase = await createClient();
   const { data: ingredients, error } = await supabase
@@ -17,9 +16,7 @@ async function IngredientTable() {
     .returns<Ingredient[]>()
     .order('name');
 
-  if (error) {
-    throw new Error(error.message);
-  }
+  if (error) throw new Error(error.message);
 
   const totalItems = ingredients?.length ?? 0;
   const lowStockItems = ingredients?.filter(
@@ -28,19 +25,19 @@ async function IngredientTable() {
 
   if (!ingredients || ingredients.length === 0) {
     return (
-      <div className="p-20 flex flex-col items-center justify-center text-center">
-        <div className="w-20 h-20 rounded-[2.5rem] bg-zinc-50 border border-zinc-100 flex items-center justify-center mb-6 shadow-inner">
-          <Package className="w-10 h-10 text-zinc-300" />
+      <div className="p-10 flex flex-col items-center justify-center text-center">
+        <div className="w-14 h-14 rounded-3xl bg-zinc-50 border border-zinc-100 flex items-center justify-center mb-4 shadow-inner">
+          <Package className="w-7 h-7 text-zinc-300" />
         </div>
-        <h3 className="text-xl font-bold text-zinc-950 mb-2 font-serif">Belum ada bahan baku</h3>
-        <p className="text-sm text-zinc-500 max-w-sm mb-8 leading-relaxed font-medium">
-          Mulai dengan menambahkan bahan pertama Anda untuk pelacakan stok dan perhitungan HPP.
+        <h3 className="text-base font-bold text-zinc-950 mb-1.5 font-serif">Belum ada bahan baku</h3>
+        <p className="text-xs text-zinc-500 max-w-xs mb-6 leading-relaxed font-medium">
+          Mulai dengan menambahkan bahan pertama Anda.
         </p>
         <Link
           href="/ingredients/new"
-          className="bg-zinc-950 text-white px-8 py-3.5 rounded-2xl font-bold text-sm transition-all hover:bg-zinc-800"
+          className="bg-zinc-950 text-white px-6 py-2.5 rounded-2xl font-bold text-xs transition-all hover:bg-zinc-800"
         >
-          Tambah Bahan Sekarang
+          Tambah Bahan
         </Link>
       </div>
     );
@@ -49,147 +46,134 @@ async function IngredientTable() {
   return (
     <>
       {/* Summary strip */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 px-8 pt-8">
+      <div className="grid grid-cols-2 gap-3 px-4 pt-4 sm:grid-cols-4 sm:px-6">
         {[
           { label: 'Total Bahan', value: totalItems },
           { label: 'Stok Aman', value: totalItems - lowStockItems.length },
-          {
-            label: 'Stok Menipis',
-            value: lowStockItems.length,
-            isDanger: lowStockItems.length > 0,
-          },
+          { label: 'Stok Menipis', value: lowStockItems.length, isDanger: lowStockItems.length > 0 },
           { label: 'Kategori', value: new Set(ingredients.map((i) => i.category)).size },
         ].map((s) => (
-          <div
-            key={s.label}
-            className="px-6 py-5 bg-zinc-50/50 border border-zinc-100 rounded-2xl"
-          >
-            <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-1">
-              {s.label}
-            </p>
-            <p className="text-3xl font-bold font-mono tracking-tighter text-zinc-950">
-              {s.value}
-            </p>
+          <div key={s.label} className="px-3 py-3 bg-zinc-50/50 border border-zinc-100 rounded-xl">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-400 mb-0.5">{s.label}</p>
+            <p className="text-2xl font-bold font-mono tracking-tighter text-zinc-950">{s.value}</p>
           </div>
         ))}
       </div>
 
       {/* Low stock banner */}
       {lowStockItems.length > 0 && (
-        <div className="mx-8 mt-4 flex items-center gap-3 px-5 py-3 bg-zinc-950 text-white rounded-2xl text-xs font-bold">
-          <AlertTriangle className="w-4 h-4 shrink-0" />
-          <span>
+        <div className="mx-4 mt-3 flex items-center gap-2.5 px-4 py-2.5 bg-zinc-950 text-white rounded-xl text-xs font-bold sm:mx-6">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+          <span className="text-[10px]">
             {lowStockItems.length} bahan perlu restock:{' '}
-            {lowStockItems
-              .slice(0, 3)
-              .map((i) => i.name)
-              .join(', ')}
-            {lowStockItems.length > 3 && ` +${lowStockItems.length - 3} lainnya`}
+            {lowStockItems.slice(0, 2).map((i) => i.name).join(', ')}
+            {lowStockItems.length > 2 && ` +${lowStockItems.length - 2}`}
           </span>
         </div>
       )}
 
-      {/* Table */}
-      <div className="overflow-x-auto mt-4">
+      {/* Mobile card list */}
+      <div className="block sm:hidden p-4 space-y-2.5">
+        {ingredients.map((item) => {
+          const isLowStock = Number(item.stock) <= Number(item.low_stock_threshold);
+          return (
+            <div key={item.id} className={cn(
+              'bg-white rounded-2xl border p-4 flex items-center gap-3',
+              isLowStock ? 'border-zinc-950 ring-1 ring-zinc-950' : 'border-zinc-100'
+            )}>
+              <div className={cn(
+                'w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs ring-1 shrink-0',
+                isLowStock ? 'bg-zinc-950 text-white ring-zinc-950' : 'bg-zinc-100 text-zinc-400 ring-zinc-200'
+              )}>
+                {item.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <p className="font-bold text-xs text-zinc-950 truncate">{item.name}</p>
+                  {isLowStock && (
+                    <span className="text-[8px] font-bold uppercase tracking-wider text-zinc-950 bg-zinc-100 px-1.5 py-0.5 rounded shrink-0">Low</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-zinc-50 border border-zinc-200 text-zinc-600 uppercase tracking-wider">{item.category}</span>
+                  <span className="text-xs font-bold font-mono text-zinc-950">{item.stock} <span className="text-[9px] font-bold text-zinc-400 uppercase">{item.unit}</span></span>
+                </div>
+              </div>
+              <Link
+                href={`/ingredients/${item.id}`}
+                className="shrink-0 p-2 bg-zinc-50 border border-zinc-200 rounded-xl hover:bg-zinc-950 hover:text-white hover:border-zinc-950 transition-all"
+              >
+                <Pencil className="w-3 h-3" />
+              </Link>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Desktop Table */}
+      <div className="hidden sm:block overflow-x-auto mt-3">
         <table className="w-full whitespace-nowrap text-left border-collapse">
           <thead>
             <tr className="bg-zinc-50/50 border-b border-zinc-100">
               {['Bahan Baku', 'Kategori', 'Level Stok', 'Harga Rata-rata', ''].map((h) => (
-                <th
-                  key={h}
-                  className="px-8 py-5 text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-400"
-                >
-                  {h}
-                </th>
+                <th key={h} className="px-5 py-4 text-[9px] font-bold uppercase tracking-[0.15em] text-zinc-400">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-100">
             {ingredients.map((item) => {
-              const isLowStock =
-                Number(item.stock) <= Number(item.low_stock_threshold);
+              const isLowStock = Number(item.stock) <= Number(item.low_stock_threshold);
               return (
-                <tr
-                  key={item.id}
-                  className="group hover:bg-zinc-50/50 transition-colors"
-                >
-                  <td className="px-8 py-6">
-                    <div className="flex items-center gap-4">
-                      <div
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs ring-1 transition-all ${
-                          isLowStock
-                            ? 'bg-zinc-950 text-white ring-zinc-950'
-                            : 'bg-zinc-100 text-zinc-400 ring-zinc-200 group-hover:bg-zinc-950 group-hover:text-white group-hover:ring-zinc-950'
-                        }`}
-                      >
+                <tr key={item.id} className="group hover:bg-zinc-50/50 transition-colors">
+                  <td className="px-5 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        'w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ring-1 transition-all',
+                        isLowStock ? 'bg-zinc-950 text-white ring-zinc-950' : 'bg-zinc-100 text-zinc-400 ring-zinc-200 group-hover:bg-zinc-950 group-hover:text-white group-hover:ring-zinc-950'
+                      )}>
                         {item.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <p className="font-bold text-sm text-zinc-950">{item.name}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          {isLowStock ? (
-                            <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-950 bg-zinc-100 px-1.5 py-0.5 rounded">
-                              Low Stock
-                            </span>
-                          ) : (
-                            <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-300">
-                              Safe
-                            </span>
-                          )}
-                        </div>
+                        <p className="font-bold text-xs text-zinc-950">{item.name}</p>
+                        {isLowStock ? (
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-950 bg-zinc-100 px-1.5 py-0.5 rounded">Low Stock</span>
+                        ) : (
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-300">Safe</span>
+                        )}
                       </div>
                     </div>
                   </td>
-                  <td className="px-8 py-6">
-                    <span className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-600 uppercase tracking-wider">
-                      {item.category}
-                    </span>
+                  <td className="px-5 py-4">
+                    <span className="text-[9px] font-bold px-2 py-1 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-600 uppercase tracking-wider">{item.category}</span>
                   </td>
-                  <td className="px-8 py-6">
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-xl font-bold font-mono tracking-tighter text-zinc-950">
-                        {item.stock}
-                      </span>
-                      <span className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest">
-                        {item.unit}
-                      </span>
+                  <td className="px-5 py-4">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-base font-bold font-mono tracking-tighter text-zinc-950">{item.stock}</span>
+                      <span className="text-[9px] font-bold uppercase text-zinc-400 tracking-widest">{item.unit}</span>
                     </div>
-                    <div className="mt-2 h-1 bg-zinc-100 rounded-full w-28 overflow-hidden">
+                    <div className="mt-1.5 h-1 bg-zinc-100 rounded-full w-20 overflow-hidden">
                       <div
-                        className={`h-full transition-all duration-700 ${
-                          isLowStock ? 'bg-zinc-950' : 'bg-zinc-300'
-                        }`}
-                        style={{
-                          width: `${Math.min(
-                            100,
-                            (Number(item.stock) /
-                              Math.max(Number(item.low_stock_threshold) * 2.5, 1)) *
-                              100
-                          )}%`,
-                        }}
+                        className={`h-full transition-all duration-700 ${isLowStock ? 'bg-zinc-950' : 'bg-zinc-300'}`}
+                        style={{ width: `${Math.min(100, (Number(item.stock) / Math.max(Number(item.low_stock_threshold) * 2.5, 1)) * 100)}%` }}
                       />
                     </div>
                   </td>
-                  <td className="px-8 py-6">
+                  <td className="px-5 py-4">
                     {Number(item.average_price) > 0 ? (
-                      <div className="font-mono text-sm font-bold text-zinc-950 tracking-tighter">
+                      <div className="font-mono text-xs font-bold text-zinc-950 tracking-tighter">
                         Rp {Number(item.average_price).toLocaleString('id-ID')}
-                        <span className="text-[10px] ml-1.5 text-zinc-400 font-sans tracking-normal uppercase">
-                          / {item.unit}
-                        </span>
+                        <span className="text-[9px] ml-1 text-zinc-400 font-sans tracking-normal uppercase">/ {item.unit}</span>
                       </div>
                     ) : (
-                      <span className="text-[10px] font-bold italic text-zinc-300 uppercase tracking-widest">
-                        No Data
-                      </span>
+                      <span className="text-[9px] font-bold italic text-zinc-300 uppercase tracking-widest">No Data</span>
                     )}
                   </td>
-                  <td className="px-8 py-6 text-right">
+                  <td className="px-5 py-4 text-right">
                     <Link
                       href={`/ingredients/${item.id}`}
-                      className="inline-flex items-center gap-2 bg-white border border-zinc-200 px-4 py-2 rounded-xl text-xs font-bold transition-all hover:bg-zinc-950 hover:text-white hover:border-zinc-950"
+                      className="inline-flex items-center gap-1.5 bg-white border border-zinc-200 px-3 py-1.5 rounded-xl text-xs font-bold transition-all hover:bg-zinc-950 hover:text-white hover:border-zinc-950"
                     >
-                      <Pencil className="w-3.5 h-3.5" />
+                      <Pencil className="w-3 h-3" />
                       Edit
                     </Link>
                   </td>
@@ -203,51 +187,44 @@ async function IngredientTable() {
   );
 }
 
-// ─── Page Shell ───────────────────────────────────────────────────────────────
+function cn(...inputs: any[]) {
+  return inputs.filter(Boolean).join(' ');
+}
+
 export default function IngredientsPage() {
   return (
-    <div className="p-6 lg:p-10 max-w-7xl mx-auto space-y-10">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-5">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-end sm:items-center justify-between gap-6 border-b border-zinc-200 pb-8">
+      <div className="flex flex-col gap-3 border-b border-zinc-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 mb-2 font-mono">
-            ◆ Inventori
-          </p>
-          <h1 className="text-4xl font-bold tracking-tight text-zinc-950 font-serif">
-            Bahan Baku
-          </h1>
-          <p className="text-sm mt-1.5 text-zinc-500 font-medium tracking-tight">
-            Kelola material dan pantau level stok secara real-time
-          </p>
+          <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-400 mb-1 font-mono">◆ Inventori</p>
+          <h1 className="text-2xl font-bold tracking-tight text-zinc-950 font-serif sm:text-3xl">Bahan Baku</h1>
+          <p className="text-xs mt-1 text-zinc-500 font-medium">Kelola material dan pantau level stok</p>
         </div>
-        <div className='flex gap-4 flex-wrap justify-end'>
-        <CsvImportButton />
-
-        <Link
-          href="/ingredients/new"
-          className="inline-flex items-center gap-2.5 bg-zinc-950 text-white px-5 sm:px-6 py-3 rounded-2xl font-bold text-sm transition-all hover:bg-zinc-800 hover:shadow-xl hover:shadow-zinc-950/10"
+        <div className="flex gap-2 flex-wrap">
+          <CsvImportButton />
+          <Link
+            href="/ingredients/new"
+            className="inline-flex items-center gap-2 bg-zinc-950 text-white px-4 py-2.5 rounded-xl font-bold text-xs transition-all hover:bg-zinc-800"
           >
-          <PackagePlus className="w-4 h-4" />
-          <span className="hidden sm:inline">Tambah Bahan</span>
-          <span className="sm:hidden">Tambah</span>
-        </Link>
-        <Link
-          href="/ingredients/waste"
-          className="inline-flex items-center gap-2.5 bg-white border border-zinc-200 text-zinc-950 px-5 sm:px-6 py-3 rounded-2xl font-bold text-sm transition-all hover:bg-zinc-50 hover:border-zinc-300"
+            <PackagePlus className="w-3.5 h-3.5" />
+            <span>Tambah Bahan</span>
+          </Link>
+          <Link
+            href="/ingredients/waste"
+            className="inline-flex items-center gap-2 bg-white border border-zinc-200 text-zinc-950 px-4 py-2.5 rounded-xl font-bold text-xs transition-all hover:bg-zinc-50"
           >
-          <PackagePlus className="w-4 h-4 text-zinc-500" />
-          <span className="hidden sm:inline">Laporan Waste</span>
-          <span className="sm:hidden">Waste</span>
-        </Link>
-          </div>
+            <PackagePlus className="w-3.5 h-3.5 text-zinc-500" />
+            <span>Waste</span>
+          </Link>
+        </div>
       </div>
 
-      {/* Table — isolated with Suspense + ErrorBoundary */}
-      <div className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm shadow-zinc-950/5">
-        <div className="px-8 py-6 border-b border-zinc-100 bg-zinc-50/30">
-          <p className="text-sm font-bold text-zinc-950 tracking-tight">Daftar Bahan Baku</p>
+      {/* Table */}
+      <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm shadow-zinc-950/5">
+        <div className="px-4 py-4 border-b border-zinc-100 bg-zinc-50/30 sm:px-6">
+          <p className="text-xs font-bold text-zinc-950 tracking-tight">Daftar Bahan Baku</p>
         </div>
-
         <ErrorBoundary>
           <Suspense fallback={<TableSkeleton rows={6} cols={5} />}>
             <IngredientTable />
