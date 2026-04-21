@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { ShoppingCart, Plus, FileText, Calendar, ArrowRight, FlaskConical } from 'lucide-react';
+import { ShoppingCart, Plus, FileText, Calendar, ArrowRight, FlaskConical, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
@@ -79,7 +79,11 @@ export default async function ProcurementPage() {
                 const hasConversion = log.purchase_unit && Number(log.unit_conversion) > 1;
                 const stockAdded = Number(log.quantity) * (hasConversion ? Number(log.unit_conversion) : 1);
                 return (
-                  <div key={log.id} className="bg-zinc-50/50 rounded-xl border border-zinc-100 p-3.5 space-y-2">
+                  <Link
+                    key={log.id}
+                    href={`/procurement/${log.id}`}
+                    className="block bg-zinc-50/50 rounded-xl border border-zinc-100 p-3.5 space-y-2 hover:border-zinc-950 transition-all"
+                  >
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <p className="font-bold text-xs text-zinc-950">{log.ingredients?.name}</p>
@@ -97,9 +101,10 @@ export default async function ProcurementPage() {
                       <div className="flex items-center gap-1.5">
                         <div className="w-1.5 h-1.5 rounded-full bg-zinc-950" />
                         <span className="text-[9px] font-bold text-zinc-950 uppercase">+{stockAdded.toLocaleString('id-ID')} {log.ingredients?.unit}</span>
+                        <ChevronRight className="w-3 h-3 text-zinc-300" />
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>
@@ -109,7 +114,7 @@ export default async function ProcurementPage() {
               <table className="w-full whitespace-nowrap text-left border-collapse">
                 <thead>
                   <tr className="bg-zinc-50/50 border-b border-zinc-100">
-                    {['Tanggal', 'Bahan Baku', 'Tujuan / Unit', 'Status Log', 'Total Harga', 'Bukti'].map(h => (
+                    {['Tanggal', 'Bahan Baku', 'Tujuan / Unit', 'Status Log', 'Total Harga', 'Aksi'].map(h => (
                       <th key={h} className="px-5 py-4 text-[9px] font-bold uppercase tracking-[0.15em] text-zinc-400">{h}</th>
                     ))}
                   </tr>
@@ -158,14 +163,21 @@ export default async function ProcurementPage() {
                           <span className="font-bold font-mono text-xs text-zinc-950 tracking-tighter">Rp {Number(log.price).toLocaleString('id-ID')}</span>
                         </td>
                         <td className="px-5 py-4">
-                          {log.evidence_url ? (
-                            <a href={log.evidence_url} target="_blank" rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 bg-white border border-zinc-200 px-2.5 py-1.5 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all hover:bg-zinc-950 hover:text-white hover:border-zinc-950">
-                              <FileText className="w-3 h-3" />Nota
-                            </a>
-                          ) : (
-                            <span className="text-[9px] font-bold italic text-zinc-300 uppercase tracking-widest">—</span>
-                          )}
+                          <div className="flex items-center gap-2">
+                            {log.evidence_url ? (
+                              <a href={log.evidence_url} target="_blank" rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 bg-white border border-zinc-200 px-2.5 py-1.5 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all hover:bg-zinc-950 hover:text-white hover:border-zinc-950">
+                                <FileText className="w-3 h-3" />Nota
+                              </a>
+                            ) : null}
+                            <Link
+                              href={`/procurement/${log.id}`}
+                              className="inline-flex items-center gap-1.5 bg-zinc-950 text-white px-2.5 py-1.5 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all hover:bg-zinc-800"
+                            >
+                              Detail
+                              <ChevronRight className="w-3 h-3" />
+                            </Link>
+                          </div>
                         </td>
                       </tr>
                     );
